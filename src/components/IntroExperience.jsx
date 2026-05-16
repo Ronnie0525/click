@@ -69,6 +69,20 @@ export default function IntroExperience() {
     }
   }, [revealAmount, phase])
 
+  // Cursor tracking — the seam glow follows the cursor with the same formula
+  // the hero uses, so when the overlay fades to reveal the hero, the orange
+  // light visually doesn't move.
+  useEffect(() => {
+    const onMove = (e) => {
+      const x = (e.clientX / window.innerWidth) * 100
+      const y = (e.clientY / window.innerHeight) * 100
+      document.documentElement.style.setProperty('--intro-mx', `${x}%`)
+      document.documentElement.style.setProperty('--intro-my', `${y}%`)
+    }
+    window.addEventListener('pointermove', onMove, { passive: true })
+    return () => window.removeEventListener('pointermove', onMove)
+  }, [])
+
   // Body scroll lock while the intro overlay is up.
   useEffect(() => {
     if (phase === 'intro') {
@@ -205,23 +219,13 @@ export default function IntroExperience() {
         <div className="intro__glow intro__glow--a" aria-hidden="true" />
         <div className="intro__glow intro__glow--b" aria-hidden="true" />
 
-        {/* Hero-matching backdrop — grid cells, radial backlight, and vignette,
-            ramped in during scene 5 so the visual becomes literally the same
-            thing the homepage hero shows. */}
-        <div
-          className="intro__seam-cells"
-          aria-hidden="true"
-          style={{ opacity: Math.min(1, Math.max(0, (progress - 0.74) / 0.22)) }}
-        />
+        {/* Cursor-tracked orange glow — same formula as the hero's backlight,
+            so by the time the overlay fades the glow on screen IS the glow
+            the hero is drawing behind. Ramps in for scene 5. */}
         <div
           className="intro__seam-glow"
           aria-hidden="true"
           style={{ opacity: Math.min(1, Math.max(0, (progress - 0.74) / 0.22)) }}
-        />
-        <div
-          className="intro__seam-vignette"
-          aria-hidden="true"
-          style={{ opacity: Math.min(1, Math.max(0, (progress - 0.78) / 0.22)) }}
         />
 
         <div className="intro__brand" aria-hidden="true">

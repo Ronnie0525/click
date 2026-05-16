@@ -358,12 +358,13 @@ body.is-in-intro .nav {
   opacity: var(--intro-reveal, 1);
 }
 
-/* Pre-reveal: hero is "tucked inside" the orange light. As the intro's
-   reveal progress climbs 0→1, the hero zooms out from that anchor point
-   and fades in. Outside the intro flow (var defaulted to 1), this is a
-   no-op so all other pages render normally. */
+/* Pre-reveal: hero is tucked behind the intro overlay. As the intro's
+   reveal progress climbs 0→1, the hero scales out subtly from the same
+   anchor point as the orange glow (50% 65%) and fades in. Outside the
+   intro flow (var defaulted to 1), this is a no-op so all other pages
+   render normally. */
 .hero {
-  transform: scale(calc(0.62 + var(--intro-reveal, 1) * 0.38));
+  transform: scale(calc(0.88 + var(--intro-reveal, 1) * 0.12));
   transform-origin: 50% 65%;
   opacity: var(--intro-reveal, 1);
   /* No transition — value tracks the intro's wheel-driven progress in
