@@ -213,12 +213,15 @@ function MorphingLines({ progress }) {
       tmp.dir.divideScalar(length)
       tmp.quat.setFromUnitVectors(tmp.up, tmp.dir)
 
-      const mesh = meshRefs.current[i]
-      if (!mesh) continue
-      mesh.position.copy(tmp.mid)
-      mesh.quaternion.copy(tmp.quat)
-      mesh.scale.set(1, length, 1)
-      mesh.material.opacity = 0.85 * (1 + morphActivity * 0.4)
+      const group = meshRefs.current[i]
+      if (!group) continue
+      group.position.copy(tmp.mid)
+      group.quaternion.copy(tmp.quat)
+      group.scale.set(1, length, 1)
+      const core = group.children[0]
+      const halo = group.children[1]
+      if (core?.material) core.material.opacity = 1.0 * (1 + morphActivity * 0.3)
+      if (halo?.material) halo.material.opacity = 0.35 * (1 + morphActivity * 0.55)
     }
 
     // Subtle rotation only — full rotation was twisting the streaks
@@ -229,30 +232,51 @@ function MorphingLines({ progress }) {
     // Fade away as the intro reveals the hero.
     const fade = progress < 0.92 ? 1 : Math.max(0, 1 - (progress - 0.92) / 0.08)
     groupRef.current.visible = fade > 0
-    for (let i = 0; i < NUM_LINES; i++) {
-      const mesh = meshRefs.current[i]
-      if (!mesh) continue
-      mesh.material.opacity *= fade
+    if (fade < 1) {
+      for (let i = 0; i < NUM_LINES; i++) {
+        const group = meshRefs.current[i]
+        if (!group) continue
+        const core = group.children[0]
+        const halo = group.children[1]
+        if (core?.material) core.material.opacity *= fade
+        if (halo?.material) halo.material.opacity *= fade
+      }
     }
   })
 
   return (
     <group ref={groupRef}>
       {Array.from({ length: NUM_LINES }, (_, i) => (
-        <mesh key={i} ref={(el) => { meshRefs.current[i] = el }}>
-          {/* Thin, many-segment cylinder so the lines read as glowing
-              beams rather than physical sticks. Native length 1 along
-              Y — we scale Y to the segment's length and rotate so Y
-              points along the segment. */}
-          <cylinderGeometry args={[0.015, 0.015, 1, 10]} />
-          <meshBasicMaterial
-            color={ORANGE_BRIGHT}
-            transparent
-            opacity={0.95}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
+        <group key={i} ref={(el) => { meshRefs.current[i] = el }}>
+          {/* Bright orange core. Native length 1 along Y — we scale Y to
+              the segment's length and rotate so Y points along the
+              segment. The group ref carries both the core + halo so
+              they transform together. */}
+          <mesh>
+            <cylinderGeometry args={[0.012, 0.012, 1, 10]} />
+            <meshBasicMaterial
+              color={ORANGE}
+              transparent
+              opacity={1.0}
+              blending={THREE.AdditiveBlending}
+              depthWrite={false}
+            />
+          </mesh>
+          {/* Soft halo so each line reads as a glowing beam, not just a
+              hairline. Additive on top of the core boosts the brightness
+              along the centre while the edges falloff via the wider
+              cylinder's lower opacity. */}
+          <mesh>
+            <cylinderGeometry args={[0.04, 0.04, 1, 8]} />
+            <meshBasicMaterial
+              color={ORANGE}
+              transparent
+              opacity={0.35}
+              blending={THREE.AdditiveBlending}
+              depthWrite={false}
+            />
+          </mesh>
+        </group>
       ))}
     </group>
   )
