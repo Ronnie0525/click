@@ -241,45 +241,67 @@ function Scene2({ weight, progress }) {
   )
 }
 
-/* ---------- Scene 3: 3D brand mark — torus knot with glow ---------- */
+/* ---------- Scene 3: wireframe icosahedron with orbiting sparks ---------- */
 
 function Scene3({ weight }) {
-  const meshRef = useRef()
-  const ringRef = useRef()
+  const wireRef = useRef()
+  const coreRef = useRef()
+  const orbitRef = useRef()
+  const SPARKS = 240
 
-  useFrame((_, dt) => {
-    if (meshRef.current) {
-      meshRef.current.rotation.y += dt * 0.6
-      meshRef.current.rotation.x += dt * 0.2
-      meshRef.current.material.opacity = weight
-      meshRef.current.scale.setScalar(0.5 + weight * 0.7)
+  const sparkPositions = useMemo(() => {
+    const arr = new Float32Array(SPARKS * 3)
+    for (let i = 0; i < SPARKS; i++) {
+      const r = 1.8 + Math.random() * 1.3
+      const theta = Math.random() * Math.PI * 2
+      const phi = Math.acos(2 * Math.random() - 1)
+      arr[i * 3] = r * Math.sin(phi) * Math.cos(theta)
+      arr[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta)
+      arr[i * 3 + 2] = r * Math.cos(phi)
     }
-    if (ringRef.current) {
-      ringRef.current.rotation.z += dt * 0.4
-      ringRef.current.material.opacity = weight * 0.7
-      ringRef.current.scale.setScalar(0.6 + weight * 0.9)
+    return arr
+  }, [])
+
+  useFrame((state, dt) => {
+    const t = state.clock.getElapsedTime()
+    const pulse = 1 + Math.sin(t * 2.2) * 0.04
+    if (wireRef.current) {
+      wireRef.current.rotation.y += dt * 0.35
+      wireRef.current.rotation.x += dt * 0.18
+      wireRef.current.material.opacity = weight
+      wireRef.current.scale.setScalar(pulse * (0.4 + weight * 0.9))
+    }
+    if (coreRef.current) {
+      coreRef.current.material.opacity = weight * 0.85
+      coreRef.current.scale.setScalar(0.3 + Math.sin(t * 3) * 0.04)
+    }
+    if (orbitRef.current) {
+      orbitRef.current.rotation.y -= dt * 0.25
+      orbitRef.current.rotation.z += dt * 0.05
+      orbitRef.current.material.opacity = weight * 0.85
     }
   })
 
   if (weight <= 0.001) return null
   return (
     <group>
-      <mesh ref={meshRef}>
-        <torusKnotGeometry args={[0.9, 0.3, 160, 24]} />
-        <meshStandardMaterial
-          color={ORANGE}
-          emissive={ORANGE}
-          emissiveIntensity={1.4}
-          roughness={0.25}
-          metalness={0.6}
-          transparent
-          opacity={weight}
-        />
+      {/* Bright core glow */}
+      <mesh ref={coreRef}>
+        <sphereGeometry args={[0.42, 24, 24]} />
+        <meshBasicMaterial color={ORANGE_BRIGHT} transparent opacity={weight * 0.85} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
-      <mesh ref={ringRef} rotation={[Math.PI / 2, 0, 0]}>
-        <torusGeometry args={[2.6, 0.02, 8, 96]} />
-        <meshBasicMaterial color={ORANGE_BRIGHT} transparent opacity={weight * 0.7} blending={THREE.AdditiveBlending} />
+      {/* Wireframe icosahedron — the iconic brand mark */}
+      <mesh ref={wireRef}>
+        <icosahedronGeometry args={[1.45, 1]} />
+        <meshBasicMaterial color={ORANGE} wireframe transparent opacity={weight} blending={THREE.AdditiveBlending} />
       </mesh>
+      {/* Orbiting spark field */}
+      <points ref={orbitRef}>
+        <bufferGeometry>
+          <bufferAttribute attach="attributes-position" count={SPARKS} array={sparkPositions} itemSize={3} />
+        </bufferGeometry>
+        <pointsMaterial size={0.045} color={ORANGE_BRIGHT} transparent opacity={weight * 0.85} sizeAttenuation depthWrite={false} blending={THREE.AdditiveBlending} />
+      </points>
     </group>
   )
 }

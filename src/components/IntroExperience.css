@@ -242,33 +242,26 @@
   max-width: 18ch;
   font-size: clamp(2.4rem, 6.5vw, 5.6rem);
   font-weight: 700;
-  letter-spacing: -0.02em;
-  line-height: 1.05;
-  color: #fff;
-  text-shadow: 0 2px 30px rgba(0, 0, 0, 0.45), 0 2px 12px rgba(0, 0, 0, 0.6);
+  letter-spacing: -0.025em;
+  line-height: 1.04;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 .intro__highlight {
-  background: var(--grad-orange);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  /* re-apply a subtle glow since clipped text loses text-shadow */
-  filter: drop-shadow(0 2px 22px rgba(255, 90, 31, 0.45));
+  /* Solid bright orange, no gradient/drop-shadow smearing.
+     Slight glow via text-shadow keeps it premium without going fuzzy. */
+  color: #FFB370;
+  text-shadow: 0 0 26px rgba(255, 122, 0, 0.55), 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .intro__sub {
-  margin-top: 22px;
-  max-width: 44ch;
-  font-size: clamp(0.95rem, 1.4vw, 1.15rem);
+  margin-top: 26px;
+  max-width: 46ch;
+  font-size: clamp(0.98rem, 1.45vw, 1.18rem);
   font-weight: 500;
-  letter-spacing: 0.04em;
-  color: rgba(245, 242, 236, 0.78);
-}
-
-.intro__enter {
-  margin-top: 36px;
-  padding: 14px 30px;
-  font-size: 1rem;
+  letter-spacing: 0.06em;
+  color: rgba(245, 242, 236, 0.92);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
 }
 
 /* ============================================================

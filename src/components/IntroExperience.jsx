@@ -11,7 +11,6 @@ const SCENES = [
   {
     text: 'This is Click.',
     sub: 'Marketing. Advertising. Branding. Events. Digital Growth.',
-    cta: true,
   },
 ]
 
@@ -30,6 +29,7 @@ export default function IntroExperience({ onComplete }) {
   // Scroll listener computes which scene is active + overall progress.
   // We compute against the container's top + height so the math is identical
   // in dev and prod regardless of router base.
+  const autoEnterTimerRef = useRef(null)
   useEffect(() => {
     const onScroll = () => {
       const el = containerRef.current
@@ -39,9 +39,22 @@ export default function IntroExperience({ onComplete }) {
       const scrolled = -rect.top
       const p = total > 0 ? Math.min(1, Math.max(0, scrolled / total)) : 0
       setProgress(p)
-      // Active scene index — last 5% locks onto the final scene for the CTA.
       const idx = Math.min(SCENES.length - 1, Math.floor(p * SCENES.length))
       setActive(idx)
+
+      // Auto-enter the website once the final scene has settled. We arm a
+      // short timer at >= 0.97 so the user gets a beat to read "This is Click."
+      // and cancel it if they scroll back up.
+      if (p >= 0.97) {
+        if (!autoEnterTimerRef.current) {
+          autoEnterTimerRef.current = window.setTimeout(() => {
+            onComplete()
+          }, 1400)
+        }
+      } else if (autoEnterTimerRef.current) {
+        window.clearTimeout(autoEnterTimerRef.current)
+        autoEnterTimerRef.current = null
+      }
     }
     onScroll()
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -49,8 +62,9 @@ export default function IntroExperience({ onComplete }) {
     return () => {
       window.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onScroll)
+      if (autoEnterTimerRef.current) window.clearTimeout(autoEnterTimerRef.current)
     }
-  }, [])
+  }, [onComplete])
 
   return (
     <div className="intro" ref={containerRef}>
@@ -118,16 +132,6 @@ export default function IntroExperience({ onComplete }) {
           >
             <h2 className="intro__text">{renderHighlights(scene.text)}</h2>
             {scene.sub && <p className="intro__sub">{scene.sub}</p>}
-            {scene.cta && (
-              <button
-                type="button"
-                className="btn btn-primary intro__enter"
-                onClick={onComplete}
-              >
-                Enter Website
-                <span className="btn-arrow" aria-hidden="true" />
-              </button>
-            )}
           </div>
         ))}
       </div>
