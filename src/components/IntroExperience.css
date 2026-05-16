@@ -18,10 +18,16 @@
   opacity: var(--intro-overlay-opacity, 1);
   transition: opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1);
 }
+.intro--done,
+.intro--done * {
+  /* Block ALL pointer events on the invisible overlay and every descendant —
+     otherwise the children's default pointer-events: auto silently swallows
+     mousemove and the hero's cursor-tracked glow never updates. Re-entry
+     gestures are caught by window-level listeners, not the DOM. */
+  pointer-events: none !important;
+}
 .intro--done {
-  pointer-events: none;
   opacity: 0;
-  /* keep it mounted (for scroll-up re-entry) but invisible & non-interactive */
 }
 
 .intro__stage {
