@@ -341,16 +341,33 @@ main {
   padding-top: var(--nav-h);
 }
 
-/* The intro renders as the top section of the homepage; the site shell
-   sits below it. While the intro occupies the viewport, hide the navbar
-   so it doesn't compete with the intro's own brand mark. */
+/* The intro overlay drives a `--intro-reveal` CSS variable (0..1) on the
+   root element. When the user is mid-intro, reveal = 0 and the site is
+   hidden behind the overlay anyway; during the reveal window the hero
+   zooms in from 50% 65% (the same screen point the intro's orange glow
+   sits at), so the orange light is the only thing that doesn't move
+   across the seam. */
+:root { --intro-reveal: 1; }
 body.is-in-intro .nav {
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-100%);
+  transform: translateY(-12px);
 }
 .nav {
-  transition: opacity 0.35s ease, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), background 0.3s ease, border-color 0.3s ease;
+  transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), background 0.3s ease, border-color 0.3s ease;
+  opacity: var(--intro-reveal, 1);
+}
+
+/* Pre-reveal: hero is "tucked inside" the orange light. As the intro's
+   reveal progress climbs 0→1, the hero zooms out from that anchor point
+   and fades in. Outside the intro flow (var defaulted to 1), this is a
+   no-op so all other pages render normally. */
+.hero {
+  transform: scale(calc(0.62 + var(--intro-reveal, 1) * 0.38));
+  transform-origin: 50% 65%;
+  opacity: var(--intro-reveal, 1);
+  /* No transition — value tracks the intro's wheel-driven progress in
+     real time so it feels responsive to scroll speed. */
 }
 
 .page-hero {

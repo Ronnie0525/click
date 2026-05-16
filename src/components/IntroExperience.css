@@ -5,20 +5,29 @@
    user scrolls; the final scene reveals the "Enter Website" CTA.
    ============================================================ */
 
+/* The intro is a fixed full-viewport overlay, not part of the page flow.
+   While phase=intro, body scroll is locked and wheel/touch deltas drive
+   `progress`. The overlay fades out as the reveal completes. */
 .intro {
-  position: relative;
-  width: 100%;
-  height: 500vh;            /* 5 scenes × 100vh = 5 screens of scroll */
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
   background: #000;
   color: var(--cream);
   isolation: isolate;
+  opacity: var(--intro-overlay-opacity, 1);
+  transition: opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.intro--done {
+  pointer-events: none;
+  opacity: 0;
+  /* keep it mounted (for scroll-up re-entry) but invisible & non-interactive */
 }
 
-.intro__sticky {
-  position: sticky;
-  top: 0;
-  height: 100vh;
+.intro__stage {
+  position: relative;
   width: 100%;
+  height: 100%;
   overflow: hidden;
   display: grid;
   place-items: center;
@@ -49,6 +58,34 @@
   background:
     radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.3) 55%, rgba(0, 0, 0, 0.75) 100%),
     linear-gradient(180deg, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0) 25%, rgba(0, 0, 0, 0) 75%, rgba(0, 0, 0, 0.45) 100%);
+}
+
+/* ---------- Hero-glow handoff layer ----------
+ * Sits above the 3D canvas and below the text. Opacity is driven by an
+ * inline style based on scroll progress so it ramps in only on the final
+ * beat. The gradient is identical to the homepage hero's .hero__bg-glow so
+ * the seam between intro and hero is visually continuous.
+ */
+.intro__seam-glow {
+  position: absolute;
+  inset: -10%;
+  z-index: 2;
+  pointer-events: none;
+  filter: blur(22px);
+  background:
+    radial-gradient(
+      circle 620px at 50% 65%,
+      rgba(255, 122, 0, 0.22) 0%,
+      transparent 60%
+    ),
+    radial-gradient(
+      circle 380px at 50% 65%,
+      #ff8a1a 0%,
+      #ff5a1f 18%,
+      #c93600 38%,
+      rgba(201, 54, 0, 0.28) 58%,
+      transparent 78%
+    );
 }
 
 /* Brand glow accents — pure CSS, on top of the Spline scene */
@@ -233,9 +270,26 @@
   color: #ffffff;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
 }
+
+/* Per-word reveal: words rise + fade with a stagger when their parent scene
+   becomes active. On scene exit they leave together (no per-word stagger)
+   so transitions feel theatrical on entrance, snappy on exit. */
+.intro__word {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(22px);
+  transition:
+    opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: 0ms;
+}
+.intro__scene.is-active .intro__word {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: calc(var(--word-i, 0) * 90ms);
+}
+
 .intro__highlight {
-  /* Solid bright orange, no gradient/drop-shadow smearing.
-     Slight glow via text-shadow keeps it premium without going fuzzy. */
   color: #FFB370;
   text-shadow: 0 0 26px rgba(255, 122, 0, 0.55), 0 1px 2px rgba(0, 0, 0, 0.5);
 }

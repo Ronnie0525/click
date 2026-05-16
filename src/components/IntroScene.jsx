@@ -64,10 +64,11 @@ export default function IntroScene({ progress = 0 }) {
 function CameraRig({ progress }) {
   useFrame((state) => {
     const { camera, mouse } = state
-    // Dolly forward through the story, then pull back on the final beat.
-    const z = progress < 0.8 ? 7 - progress * 5 : 3 + (progress - 0.8) * 18
-    camera.position.z += (z - camera.position.z) * 0.06
-    // Subtle parallax from cursor — makes the scene feel "alive" even when static
+    // Through scenes 1-4 the camera dollies forward. On the final scene we
+    // push *into* the glow so the intro ends "inside" the light — which is
+    // the same light the hero section opens with. No visible cut.
+    const z = progress < 0.8 ? 7 - progress * 5 : 3 - (progress - 0.8) * 12
+    camera.position.z += (z - camera.position.z) * 0.08
     const tx = mouse.x * 0.3
     const ty = mouse.y * 0.2
     camera.position.x += (tx - camera.position.x) * 0.04
@@ -306,47 +307,69 @@ function Scene3({ weight, progress }) {
   )
 }
 
-/* ---------- Scene 4: soft lens flare / haze for the final beat ---------- */
+/* ---------- Scene 4: hero-glow handoff ----------
+ * Designed to be visually indistinguishable from the hero section's
+ * radial glow at scroll = 1.0 so the seam into the homepage is a
+ * continuation, not a cut.
+ *  - Bright "sun" disc at center-bottom (matches hero's --mx 50% / --my 65%)
+ *  - Softer halo behind it for spotlight body
+ *  - Light dust particles around it as the camera dives in
+ */
 
 function Scene4({ weight, progress }) {
+  const coreRef = useRef()
   const haloRef = useRef()
-  const sparksRef = useRef()
-  const COUNT = 600
+  const dustRef = useRef()
+  const COUNT = 380
   const positions = useMemo(() => {
     const arr = new Float32Array(COUNT * 3)
     for (let i = 0; i < COUNT; i++) {
-      const r = Math.pow(Math.random(), 0.6) * 5
+      const r = Math.pow(Math.random(), 0.5) * 4
       const theta = Math.random() * Math.PI * 2
       arr[i * 3] = Math.cos(theta) * r
-      arr[i * 3 + 1] = Math.sin(theta) * r
-      arr[i * 3 + 2] = (Math.random() - 0.5) * 2
+      arr[i * 3 + 1] = Math.sin(theta) * r - 1
+      arr[i * 3 + 2] = (Math.random() - 0.5) * 3
     }
     return arr
   }, [])
 
-  useFrame(() => {
+  // How much we've leaned into the final "merge with hero" beat (0 until 0.85,
+  // ramps to 1 at scroll = 1.0). Drives the disc swell.
+  const seam = Math.min(1, Math.max(0, (progress - 0.85) / 0.15))
+
+  useFrame((state) => {
+    const t = state.clock.getElapsedTime()
+    if (coreRef.current) {
+      coreRef.current.scale.setScalar((0.7 + seam * 1.6) * (1 + Math.sin(t * 1.8) * 0.02))
+      coreRef.current.material.opacity = weight * 0.95
+    }
     if (haloRef.current) {
-      haloRef.current.rotation.z = progress * Math.PI * 0.8
+      haloRef.current.rotation.z = progress * Math.PI * 0.3
+      haloRef.current.scale.setScalar(1 + seam * 0.9)
       haloRef.current.material.opacity = weight * 0.55
     }
-    if (sparksRef.current) {
-      sparksRef.current.rotation.z = -progress * Math.PI * 0.4
-      sparksRef.current.material.opacity = weight
+    if (dustRef.current) {
+      dustRef.current.rotation.z = -progress * Math.PI * 0.18
+      dustRef.current.material.opacity = weight * 0.55 * (1 - seam * 0.6)
     }
   })
 
   if (weight <= 0.001) return null
   return (
-    <group>
-      <mesh ref={haloRef} position={[0, 0, -1]}>
-        <circleGeometry args={[3.4, 64]} />
-        <meshBasicMaterial color={ORANGE} transparent opacity={weight * 0.5} blending={THREE.AdditiveBlending} depthWrite={false} />
+    <group position={[0, -1.4, 0]}>
+      <mesh ref={haloRef} position={[0, 0, -2]}>
+        <circleGeometry args={[6, 64]} />
+        <meshBasicMaterial color={ORANGE} transparent opacity={weight * 0.55} blending={THREE.AdditiveBlending} depthWrite={false} />
       </mesh>
-      <points ref={sparksRef}>
+      <mesh ref={coreRef} position={[0, 0, -1]}>
+        <circleGeometry args={[2.2, 64]} />
+        <meshBasicMaterial color={ORANGE_BRIGHT} transparent opacity={weight * 0.95} blending={THREE.AdditiveBlending} depthWrite={false} />
+      </mesh>
+      <points ref={dustRef}>
         <bufferGeometry>
           <bufferAttribute attach="attributes-position" count={COUNT} array={positions} itemSize={3} />
         </bufferGeometry>
-        <pointsMaterial size={0.06} color={ORANGE_BRIGHT} transparent opacity={weight} sizeAttenuation depthWrite={false} blending={THREE.AdditiveBlending} />
+        <pointsMaterial size={0.05} color={ORANGE_BRIGHT} transparent opacity={weight * 0.55} sizeAttenuation depthWrite={false} blending={THREE.AdditiveBlending} />
       </points>
     </group>
   )
