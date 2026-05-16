@@ -24,12 +24,14 @@ const DEEP = '#C93600'
 
 const NUM_PARTICLES = 600
 const NUM_LINES = 60
-const NUM_STAGES = 5
+const NUM_STAGES = 6                              // 0% 20% 40% 60% 80% 100%
 
-// Opacity per stage. Particles lead at the start and end; lines lead in
-// the middle three beats.
-const PARTICLE_OPACITY = [1.00, 0.18, 0.18, 0.45, 1.00]
-const LINE_OPACITY     = [0.00, 0.95, 0.95, 0.65, 0.00]
+// Opacity per visual stage. Particles lead at the bookends, line skeleton
+// leads through line / network / sphere, both contribute to the broken
+// beat as the sphere flies apart.
+//                                cloud  line   net    sphere  broken  bg
+const PARTICLE_OPACITY = [1.00,  0.40,  0.35,  0.15,   0.55,   1.00]
+const LINE_OPACITY     = [0.00,  0.95,  0.95,  0.95,   0.70,   0.00]
 
 /* ---------- Root ---------- */
 
@@ -133,51 +135,64 @@ function ParticleField({ progress }) {
       stages[0][i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta)
       stages[0][i * 3 + 2] = r * Math.cos(phi) * 0.7 - 1
     }
-    // Stage 1 — particles align along 60 vertical lines so they read as
-    // the "dust" inside the streaks the line skeleton is drawing.
-    const NUM_LANES = 60
-    const PER_LANE = Math.ceil(NUM_PARTICLES / NUM_LANES)
-    for (let l = 0; l < NUM_LANES; l++) {
-      const lx = (Math.random() - 0.5) * 12
-      const ly = (Math.random() - 0.5) * 6
-      for (let p = 0; p < PER_LANE; p++) {
-        const i = l * PER_LANE + p
-        if (i >= NUM_PARTICLES) break
-        stages[1][i * 3]     = lx + (Math.random() - 0.5) * 0.1
-        stages[1][i * 3 + 1] = ly + (Math.random() - 0.5) * 0.1
-        stages[1][i * 3 + 2] = -8 + Math.random() * 16
-      }
+    // Stage 1 — particles align into a horizontal line stretched along
+    // the x-axis. Small y/z jitter so it reads as a glowing band rather
+    // than a perfectly sterile strip.
+    for (let i = 0; i < NUM_PARTICLES; i++) {
+      const t = i / (NUM_PARTICLES - 1)
+      stages[1][i * 3]     = (t - 0.5) * 12
+      stages[1][i * 3 + 1] = (Math.random() - 0.5) * 0.25
+      stages[1][i * 3 + 2] = (Math.random() - 0.5) * 0.4
     }
-    // Stage 2 — Fibonacci-distributed sphere shell so particles sit on
-    // the same surface as the icosahedron the line skeleton draws.
+    // Stage 2 — connected network: particles cluster around ~24 node
+    // positions so the line skeleton's network edges look like they're
+    // actually anchoring the particles.
+    const NUM_NODES = 24
+    const nodes = []
+    for (let n = 0; n < NUM_NODES; n++) {
+      nodes.push([
+        (Math.random() - 0.5) * 5,
+        (Math.random() - 0.5) * 3,
+        (Math.random() - 0.5) * 2.4 - 0.5,
+      ])
+    }
+    for (let i = 0; i < NUM_PARTICLES; i++) {
+      const n = nodes[i % NUM_NODES]
+      stages[2][i * 3]     = n[0] + (Math.random() - 0.5) * 0.4
+      stages[2][i * 3 + 1] = n[1] + (Math.random() - 0.5) * 0.4
+      stages[2][i * 3 + 2] = n[2] + (Math.random() - 0.5) * 0.4
+    }
+    // Stage 3 — Fibonacci-distributed sphere shell. Particles sit on the
+    // same surface as the icosahedron the line skeleton draws.
     const goldenAngle = Math.PI * (3 - Math.sqrt(5))
     const sphereR = 1.85
     for (let i = 0; i < NUM_PARTICLES; i++) {
       const y = 1 - (i / (NUM_PARTICLES - 1)) * 2
       const radius = Math.sqrt(1 - y * y)
       const theta = goldenAngle * i
-      stages[2][i * 3]     = Math.cos(theta) * radius * sphereR
-      stages[2][i * 3 + 1] = y * sphereR
-      stages[2][i * 3 + 2] = Math.sin(theta) * radius * sphereR
+      stages[3][i * 3]     = Math.cos(theta) * radius * sphereR
+      stages[3][i * 3 + 1] = y * sphereR
+      stages[3][i * 3 + 2] = Math.sin(theta) * radius * sphereR
     }
-    // Stage 3 — broken / exploded: stage-2 positions pushed radially
-    // outward by 2-3× so the sphere visibly bursts apart.
+    // Stage 4 — broken / exploded: sphere positions pushed radially
+    // outward by 2-3× so the wireframe visibly bursts apart.
     for (let i = 0; i < NUM_PARTICLES; i++) {
-      const sx = stages[2][i * 3], sy = stages[2][i * 3 + 1], sz = stages[2][i * 3 + 2]
+      const sx = stages[3][i * 3], sy = stages[3][i * 3 + 1], sz = stages[3][i * 3 + 2]
       const len = Math.sqrt(sx * sx + sy * sy + sz * sz) || 0.001
       const k = 2.4 + Math.random() * 0.8
-      stages[3][i * 3]     = (sx / len) * len * k
-      stages[3][i * 3 + 1] = (sy / len) * len * k
-      stages[3][i * 3 + 2] = (sz / len) * len * k
+      stages[4][i * 3]     = (sx / len) * len * k
+      stages[4][i * 3 + 1] = (sy / len) * len * k
+      stages[4][i * 3 + 2] = (sz / len) * len * k
     }
-    // Stage 4 — hero glow disc at the same anchor as the homepage hero
-    // backlight (centred at y = -1.6, vertically squashed 0.55).
+    // Stage 5 — particles spread outward into an animated background, with
+    // a softer concentration near the hero glow anchor (centred at
+    // y = -1.6 to match the homepage hero's --my: 65%).
     for (let i = 0; i < NUM_PARTICLES; i++) {
-      const r = Math.pow(Math.random(), 0.55) * 2.4
+      const r = Math.pow(Math.random(), 0.5) * 4
       const theta = Math.random() * Math.PI * 2
-      stages[4][i * 3]     = Math.cos(theta) * r
-      stages[4][i * 3 + 1] = Math.sin(theta) * r * 0.55 - 1.6
-      stages[4][i * 3 + 2] = (Math.random() - 0.5) * 0.6
+      stages[5][i * 3]     = Math.cos(theta) * r
+      stages[5][i * 3 + 1] = Math.sin(theta) * r * 0.55 - 1.2
+      stages[5][i * 3 + 2] = (Math.random() - 0.5) * 1.4
     }
 
     positions.set(stages[0])
@@ -249,7 +264,8 @@ function LineSkeleton({ progress }) {
 
   const stages = useMemo(() => [
     generateCloudPairs(NUM_LINES),
-    generateStreakPairs(NUM_LINES),
+    generateHorizontalLinePairs(NUM_LINES),
+    generateNetworkPairs(NUM_LINES),
     generateSpherePairs(NUM_LINES),
     generateBrokenPairs(NUM_LINES),
     generateConvergedPairs(NUM_LINES),
@@ -351,19 +367,67 @@ function generateCloudPairs(n) {
   return arr
 }
 
-function generateStreakPairs(n) {
-  // 60 long lines parallel to the camera z-axis.
+function generateHorizontalLinePairs(n) {
+  // A single bright horizontal line stretched along the x-axis, drawn as
+  // n short overlapping segments so it reads as one continuous glowing
+  // band. Y/z jitter is tiny so the line stays clearly horizontal.
+  const SPAN = 12
   const arr = []
   for (let i = 0; i < n; i++) {
-    const x = (Math.random() - 0.5) * 12
-    const y = (Math.random() - 0.5) * 6
-    const len = 8 + Math.random() * 5
+    const t = i / n
+    const segWidth = (SPAN * 1.05) / n
+    const cx = (t - 0.5) * SPAN
+    const y = (Math.random() - 0.5) * 0.08
+    const z = (Math.random() - 0.5) * 0.2
     arr.push({
-      from: new THREE.Vector3(x, y, -len / 2),
-      to:   new THREE.Vector3(x, y, len / 2),
+      from: new THREE.Vector3(cx - segWidth / 2, y, z),
+      to:   new THREE.Vector3(cx + segWidth / 2, y, z),
     })
   }
   return arr
+}
+
+function generateNetworkPairs(n) {
+  // Connected network — same 24-node layout as the particle field's
+  // stage 2 (deterministic PRNG so they align). Each edge connects to
+  // one of the 3 nearest neighbours so the result reads as a coherent
+  // web rather than a pile of sticks.
+  const NUM_NODES = 24
+  const rng = mulberry32(0xC11C)
+  const nodes = []
+  for (let i = 0; i < NUM_NODES; i++) {
+    nodes.push(new THREE.Vector3(
+      (rng() - 0.5) * 5,
+      (rng() - 0.5) * 3,
+      (rng() - 0.5) * 2.4 - 0.5,
+    ))
+  }
+  const arr = []
+  for (let i = 0; i < n; i++) {
+    const aIdx = i % NUM_NODES
+    const a = nodes[aIdx]
+    const cand = nodes
+      .map((p, j) => ({ j, d: a.distanceTo(p) }))
+      .filter(({ j }) => j !== aIdx)
+      .sort((x, y) => x.d - y.d)
+      .slice(0, 3)
+    const pick = cand[Math.floor(Math.random() * cand.length)]
+    arr.push({ from: a.clone(), to: nodes[pick.j].clone() })
+  }
+  return arr
+}
+
+// Tiny deterministic PRNG used to keep the network's node layout aligned
+// with the particle field's stage-2 cluster centres across both generators.
+function mulberry32(seed) {
+  let a = seed >>> 0
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0
+    let t = a
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
 }
 
 function generateSpherePairs(n) {
