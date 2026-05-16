@@ -24,36 +24,31 @@
   place-items: center;
 }
 
-/* ---------- 3D layer ---------- */
-.intro__spline {
+/* ---------- 3D layer (R3F canvas) ---------- */
+.intro__scene-3d {
   position: absolute;
   inset: 0;
   z-index: 0;
-  /* The spline-viewer custom element captures mouse + wheel + touch by default
-     (it's built to be orbit-draggable). That swallows scroll and freezes the
-     intro on scene 1. We want it purely decorative, so disable input. */
   pointer-events: none;
   touch-action: auto;
 }
-.intro__spline spline-viewer {
+.intro__scene-3d canvas {
   width: 100% !important;
   height: 100% !important;
   display: block;
-  pointer-events: none;
-  touch-action: auto;
-  /* let the brand glow shine through subtle parts of the scene */
-  filter: saturate(1.05);
 }
 
-/* Dark vignette so text reads cleanly over the 3D scene */
+/* Soft vignette so the text always reads cleanly over the 3D scene.
+   Reduced compared to the Spline-era overlay since the WebGL scene already
+   has its own depth/fog and we want the brand particles to feel present. */
 .intro__overlay {
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
   background:
-    radial-gradient(ellipse at center, rgba(0, 0, 0, 0.35) 0%, rgba(0, 0, 0, 0.7) 60%, rgba(0, 0, 0, 0.9) 100%),
-    linear-gradient(180deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0.2) 30%, rgba(0, 0, 0, 0.6) 100%);
+    radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.3) 55%, rgba(0, 0, 0, 0.75) 100%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0) 25%, rgba(0, 0, 0, 0) 75%, rgba(0, 0, 0, 0.45) 100%);
 }
 
 /* Brand glow accents — pure CSS, on top of the Spline scene */
@@ -292,17 +287,13 @@
 }
 
 @media (max-width: 600px) {
-  /* On very small screens, mobile GPUs choke on Spline + overlays.
-     Hide Spline and rely on the brand glow as the visual. */
-  .intro__spline { display: none; }
+  /* Mobile GPUs handle the R3F scene fine in low-DPR mode, but we relax
+     the vignette so it doesn't fight the smaller viewport. */
   .intro__overlay {
     background:
-      radial-gradient(ellipse at center, rgba(15, 5, 0, 0.4) 0%, rgba(0, 0, 0, 0.9) 70%);
+      radial-gradient(ellipse at center, rgba(0, 0, 0, 0) 0%, rgba(0, 0, 0, 0.45) 55%, rgba(0, 0, 0, 0.85) 100%);
   }
-  .intro__glow {
-    filter: blur(90px);
-    opacity: 0.85;
-  }
+  .intro__glow { filter: blur(90px); opacity: 0.85; }
 }
 
 @media (prefers-reduced-motion: reduce) {
