@@ -1,20 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { motion, useScroll, useTransform, useMotionValueEvent } from 'motion/react'
 import './IntroExperience.css'
 
 const SCENES = [
-  {
-    text: 'Every brand wants attention.',
-  },
-  {
-    text: 'But attention alone is not enough.',
-  },
-  {
-    text: 'Strategy turns attention into growth.',
-  },
-  {
-    text: 'Creativity makes brands unforgettable.',
-  },
+  { text: 'Every brand wants attention.' },
+  { text: 'But attention alone is not enough.' },
+  { text: 'Strategy turns attention into growth.' },
+  { text: 'Creativity makes brands unforgettable.' },
   {
     text: 'This is Click.',
     sub: 'Marketing. Advertising. Branding. Events. Digital Growth.',
@@ -23,60 +14,80 @@ const SCENES = [
 ]
 
 const SPLINE_URL = 'https://prod.spline.design/FMcrcJ3RFG369YBa/scene.splinecode'
+const HIGHLIGHTS = ['attention', 'growth', 'unforgettable', 'Click']
 
 export default function IntroExperience({ onComplete }) {
   const containerRef = useRef(null)
-  const [splineReady, setSplineReady] = useState(false)
-  const [reducedMotion, setReducedMotion] = useState(false)
+  const [active, setActive] = useState(0)
+  const [progress, setProgress] = useState(0)        // 0..1 across whole intro
+  const [splineDefined, setSplineDefined] = useState(false)
 
-  const { scrollYProgress } = useScroll({
-    target: containerRef,
-    offset: ['start start', 'end end'],
-  })
-
+  // Reset scroll once on mount so the intro always starts at scene 1.
   useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)')
-    setReducedMotion(mq.matches)
+    window.scrollTo({ top: 0 })
   }, [])
 
-  // Hide the body's scrollbar nub from spilling under the intro by not adding
-  // anything special — the intro IS the scrollable surface. Just make sure when
-  // we mount, scroll starts at top.
+  // Wait until the spline-viewer custom element is registered before mounting it.
+  // The unpkg script is a module — it may load slightly after React renders.
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' })
+    if (typeof window === 'undefined') return
+    if (window.customElements && window.customElements.get('spline-viewer')) {
+      setSplineDefined(true)
+      return
+    }
+    let cancelled = false
+    window.customElements?.whenDefined('spline-viewer').then(() => {
+      if (!cancelled) setSplineDefined(true)
+    }).catch(() => { /* ignore */ })
+    return () => { cancelled = true }
   }, [])
 
-  // Mark the final scene reached so we can softly hint the CTA even without
-  // animation timing edge cases.
-  const [atEnd, setAtEnd] = useState(false)
-  useMotionValueEvent(scrollYProgress, 'change', (v) => {
-    setAtEnd(v > 0.94)
-  })
-
-  const handleEnter = () => {
-    onComplete()
-  }
+  // Scroll listener computes which scene is active + overall progress.
+  // We compute against the container's top + height so the math is identical
+  // in dev and prod regardless of router base.
+  useEffect(() => {
+    const onScroll = () => {
+      const el = containerRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const total = el.offsetHeight - window.innerHeight
+      const scrolled = -rect.top
+      const p = total > 0 ? Math.min(1, Math.max(0, scrolled / total)) : 0
+      setProgress(p)
+      // Active scene index — last 5% locks onto the final scene for the CTA.
+      const idx = Math.min(SCENES.length - 1, Math.floor(p * SCENES.length))
+      setActive(idx)
+    }
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    window.addEventListener('resize', onScroll)
+    return () => {
+      window.removeEventListener('scroll', onScroll)
+      window.removeEventListener('resize', onScroll)
+    }
+  }, [])
 
   return (
     <div className="intro" ref={containerRef}>
       <div className="intro__sticky">
-        {/* 3D background */}
+        {/* 3D background — only mount once the custom element exists, so it
+            never causes a render error during the brief script-load window. */}
         <div className="intro__spline" aria-hidden="true">
-          <spline-viewer
-            url={SPLINE_URL}
-            events-target="global"
-            loading-anim-type="spinner-small-light"
-            onLoad={() => setSplineReady(true)}
-          />
+          {splineDefined && (
+            <spline-viewer url={SPLINE_URL} loading-anim-type="none" />
+          )}
         </div>
 
-        {/* Darken Spline so the text remains readable */}
+        {/* Always-visible decorative layers so we never render a black box. */}
         <div className="intro__overlay" aria-hidden="true" />
-        {/* Brand glow accents */}
         <div className="intro__glow intro__glow--a" aria-hidden="true" />
         <div className="intro__glow intro__glow--b" aria-hidden="true" />
 
-        {/* Skip */}
+        {/* Top chrome */}
+        <div className="intro__brand" aria-hidden="true">
+          <span className="intro__brand-mark"><span className="intro__brand-dot" /></span>
+          <span className="intro__brand-text">Click</span>
+        </div>
         <button
           type="button"
           className="intro__skip"
@@ -87,107 +98,67 @@ export default function IntroExperience({ onComplete }) {
           <span className="btn-arrow" aria-hidden="true" />
         </button>
 
-        {/* Brand mark in corner so users know whose site this is during the intro */}
-        <div className="intro__brand" aria-hidden="true">
-          <span className="intro__brand-mark"><span className="intro__brand-dot" /></span>
-          <span className="intro__brand-text">Click</span>
-        </div>
-
-        {/* Progress dots */}
+        {/* Vertical scene-progress bars */}
         <div className="intro__progress" aria-hidden="true">
-          {SCENES.map((_, i) => (
-            <ProgressDot key={i} index={i} total={SCENES.length} scroll={scrollYProgress} />
-          ))}
+          {SCENES.map((_, i) => {
+            const sceneProgress = Math.min(1, Math.max(0, progress * SCENES.length - i))
+            return (
+              <div key={i} className="intro__dot">
+                <div
+                  className="intro__dot-fill"
+                  style={{ transform: `scaleY(${sceneProgress})` }}
+                />
+              </div>
+            )
+          })}
         </div>
 
         {/* Scroll hint, only at the very start */}
-        <ScrollHint scroll={scrollYProgress} />
+        <div
+          className="intro__hint"
+          aria-hidden="true"
+          style={{ opacity: progress < 0.04 ? 1 - progress * 25 : 0 }}
+        >
+          <span>Scroll</span>
+          <span className="intro__hint-arrow" />
+        </div>
 
-        {/* The scene texts, layered. Each fades in/out within its scroll window. */}
+        {/* Scene texts — only the active one is fully visible. Plain CSS
+            transitions on opacity/transform handle the cross-fade. */}
         {SCENES.map((scene, i) => (
-          <SceneText
+          <div
             key={i}
-            scene={scene}
-            index={i}
-            total={SCENES.length}
-            scroll={scrollYProgress}
-            onEnter={handleEnter}
-            atEnd={atEnd}
-          />
+            className={`intro__scene ${i === active ? 'is-active' : ''} ${
+              i < active ? 'is-past' : ''
+            } ${i > active ? 'is-future' : ''}`}
+          >
+            <h2 className="intro__text">{renderHighlights(scene.text)}</h2>
+            {scene.sub && <p className="intro__sub">{scene.sub}</p>}
+            {scene.cta && (
+              <button
+                type="button"
+                className="btn btn-primary intro__enter"
+                onClick={onComplete}
+              >
+                Enter Website
+                <span className="btn-arrow" aria-hidden="true" />
+              </button>
+            )}
+          </div>
         ))}
       </div>
     </div>
   )
 }
 
-function SceneText({ scene, index, total, scroll, onEnter, atEnd }) {
-  const start = index / total
-  const end = (index + 1) / total
-  const isLast = index === total - 1
-
-  const opacity = useTransform(
-    scroll,
-    [start - 0.06, start + 0.05, end - 0.05, end + 0.02],
-    isLast ? [0, 1, 1, 1] : [0, 1, 1, 0]
-  )
-  const y = useTransform(
-    scroll,
-    [start - 0.06, start + 0.05, end - 0.05, end + 0.02],
-    isLast ? [50, 0, 0, 0] : [50, 0, 0, -50]
-  )
-
-  return (
-    <motion.div className="intro__scene" style={{ opacity, y }} aria-hidden={!atEnd && isLast}>
-      <h2 className="intro__text">{renderHighlights(scene.text)}</h2>
-      {scene.sub && <p className="intro__sub">{scene.sub}</p>}
-      {scene.cta && (
-        <button
-          type="button"
-          className="btn btn-primary intro__enter"
-          onClick={onEnter}
-        >
-          Enter Website
-          <span className="btn-arrow" aria-hidden="true" />
-        </button>
-      )}
-    </motion.div>
-  )
-}
-
-/**
- * Highlight key brand words in orange so the lines have visual rhythm
- * instead of a flat block of white text.
- */
 function renderHighlights(line) {
-  const targets = ['attention', 'growth', 'unforgettable', 'Click']
-  const parts = line.split(new RegExp(`(${targets.join('|')})`, 'i'))
+  const re = new RegExp(`(${HIGHLIGHTS.join('|')})`, 'gi')
+  const parts = line.split(re)
   return parts.map((p, i) =>
-    targets.some((t) => p.toLowerCase() === t.toLowerCase()) ? (
+    HIGHLIGHTS.some((h) => p.toLowerCase() === h.toLowerCase()) ? (
       <span key={i} className="intro__highlight">{p}</span>
     ) : (
       <span key={i}>{p}</span>
     )
-  )
-}
-
-function ProgressDot({ index, total, scroll }) {
-  const start = index / total
-  const end = (index + 1) / total
-  const fill = useTransform(scroll, [start, end - 0.02], [0, 1])
-  const opacity = useTransform(scroll, [start - 0.05, start + 0.02], [0.35, 1])
-  return (
-    <div className="intro__dot">
-      <motion.div className="intro__dot-fill" style={{ scaleY: fill, opacity }} />
-    </div>
-  )
-}
-
-function ScrollHint({ scroll }) {
-  const opacity = useTransform(scroll, [0, 0.04], [1, 0])
-  return (
-    <motion.div className="intro__hint" style={{ opacity }} aria-hidden="true">
-      <span>Scroll</span>
-      <span className="intro__hint-arrow" />
-    </motion.div>
   )
 }

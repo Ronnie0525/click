@@ -221,6 +221,21 @@
   text-align: center;
   padding: 24px;
   pointer-events: none;             /* let scroll pass through; only CTA needs clicks */
+  opacity: 0;
+  transform: translateY(40px);
+  transition: opacity 0.6s ease, transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.intro__scene.is-active {
+  opacity: 1;
+  transform: translateY(0);
+}
+.intro__scene.is-past {
+  opacity: 0;
+  transform: translateY(-40px);
+}
+.intro__scene.is-future {
+  opacity: 0;
+  transform: translateY(40px);
 }
 .intro__scene .btn,
 .intro__scene .intro__enter {
