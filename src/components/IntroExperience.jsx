@@ -141,24 +141,51 @@ export default function IntroExperience() {
       }
     }
 
-    // phase === 'done' — listen for "pull intro down" from top of page
-    const reopenIfPulledDown = (e) => {
-      if (window.scrollY > 2) return
-      if (e.deltaY < -8) {
-        e.preventDefault()
+    // phase === 'done' — require a sustained pull-up before re-opening, so a
+    // single trackpad flick at the top of the page doesn't snap the intro
+    // back on accidentally. We accumulate upward-scroll distance while the
+    // user is at the very top of the page and only trigger when it crosses a
+    // threshold. Any downward gesture or idle gap resets the accumulator.
+    const PULL_THRESHOLD = 260                      // px of accumulated up-pull
+    const IDLE_RESET_MS = 350
+    let accumulated = 0
+    let idleTimer = null
+    const resetSoon = () => {
+      if (idleTimer) clearTimeout(idleTimer)
+      idleTimer = setTimeout(() => { accumulated = 0 }, IDLE_RESET_MS)
+    }
+    const tryReopen = () => {
+      if (accumulated >= PULL_THRESHOLD) {
+        accumulated = 0
         reopen()
       }
     }
+
+    const reopenIfPulledDown = (e) => {
+      if (window.scrollY > 2) { accumulated = 0; return }
+      if (e.deltaY < 0) {
+        e.preventDefault()
+        accumulated += Math.min(120, -e.deltaY)   // clamp per-event spikes
+        resetSoon()
+        tryReopen()
+      } else if (e.deltaY > 0) {
+        accumulated = 0
+      }
+    }
     const lastTouch = { y: null }
-    const onTouchStart = (e) => { lastTouch.y = e.touches[0].clientY }
+    const onTouchStart = (e) => { lastTouch.y = e.touches[0].clientY; accumulated = 0 }
     const onTouchMove = (e) => {
       if (window.scrollY > 2 || lastTouch.y == null) return
       const y = e.touches[0].clientY
       const dy = y - lastTouch.y
-      if (dy > 40) {
+      lastTouch.y = y
+      if (dy > 0) {
         e.preventDefault()
-        reopen()
-        lastTouch.y = null
+        accumulated += Math.min(60, dy)
+        resetSoon()
+        tryReopen()
+      } else if (dy < -4) {
+        accumulated = 0
       }
     }
     window.addEventListener('wheel', reopenIfPulledDown, { passive: false })
@@ -168,6 +195,7 @@ export default function IntroExperience() {
       window.removeEventListener('wheel', reopenIfPulledDown)
       window.removeEventListener('touchstart', onTouchStart)
       window.removeEventListener('touchmove', onTouchMove)
+      if (idleTimer) clearTimeout(idleTimer)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase])
