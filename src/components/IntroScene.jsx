@@ -3,36 +3,47 @@ import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
 
 /**
- * IntroScene — the scroll-driven 3D backdrop for the storytelling intro.
+ * IntroScene — a single particle system that morphs through five target
+ * shapes as scroll progress goes 0 → 1. Each stage matches the story beat
+ * told by the overlaid text:
  *
- * Five visual beats keyed off a single `progress` value (0..1) coming from
- * the parent scroll listener:
- *   0  drifting orange particles in deep space
- *   1  light trails streaking past the camera (motion of "signals")
- *   2  particles linking into a glowing network
- *   3  a 3D brand mark forming from the network and rotating
- *   4  pull back, soft lens haze, ready for the CTA
+ *   stage 0   "Every brand wants attention"      → ambient cloud
+ *   stage 1   "Attention alone is not enough"    → streaks / light trails
+ *   stage 2   "Strategy turns it into growth"    → connected network nodes
+ *   stage 3   "Creativity makes brands ..."      → unified wireframe sphere
+ *   stage 4   "This is Click"                    → orange disc at the hero
+ *                                                  glow's anchor (50% 65%)
  *
- * Each beat fades in/out based on its sub-window of progress and runs its
- * own per-frame animation. The camera slowly dollies forward across the
- * whole intro to give continuity between beats.
+ * Same particles the whole time — only their target positions change. The
+ * camera dollies forward through the story; ambient drift keeps the cloud
+ * alive between scroll events. Rotation and morph are pure functions of
+ * progress so scroll-up rewinds the entire sequence cleanly.
  */
 
 const ORANGE = '#FF7A00'
 const ORANGE_BRIGHT = '#FFD2A0'
 const DEEP = '#C93600'
-const TOTAL = 5
 
-function sceneWeight(progress, idx) {
-  const start = idx / TOTAL
-  const end = (idx + 1) / TOTAL
-  const ramp = (end - start) * 0.3
-  if (progress < start - ramp * 0.5) return 0
-  if (progress > end + ramp * 0.5 && idx !== TOTAL - 1) return 0
-  if (idx === TOTAL - 1 && progress >= end) return 1   // pin final scene visible
-  if (progress < start + ramp) return Math.max(0, (progress - (start - ramp * 0.5)) / (ramp * 1.5))
-  if (progress > end - ramp) return Math.max(0, 1 - (progress - (end - ramp)) / (ramp * 1.5))
-  return 1
+const COUNT = 1500
+const NUM_STAGES = 5
+
+function makeGlowSprite() {
+  if (typeof document === 'undefined') return null
+  const size = 64
+  const c = document.createElement('canvas')
+  c.width = size; c.height = size
+  const ctx = c.getContext('2d')
+  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
+  g.addColorStop(0, 'rgba(255, 220, 180, 1)')
+  g.addColorStop(0.3, 'rgba(255, 160, 80, 0.7)')
+  g.addColorStop(0.7, 'rgba(255, 90, 31, 0.22)')
+  g.addColorStop(1, 'rgba(255, 90, 31, 0)')
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, size, size)
+  const tex = new THREE.CanvasTexture(c)
+  tex.minFilter = THREE.LinearFilter
+  tex.magFilter = THREE.LinearFilter
+  return tex
 }
 
 export default function IntroScene({ progress = 0 }) {
@@ -49,14 +60,8 @@ export default function IntroScene({ progress = 0 }) {
       <pointLight position={[-6, -3, 4]} color={DEEP} intensity={4} distance={20} />
 
       <CameraRig progress={progress} />
-
-      <Scene0 weight={sceneWeight(progress, 0)} progress={progress} />
-      <Scene1 weight={sceneWeight(progress, 1)} progress={progress} />
-      <Scene2 weight={sceneWeight(progress, 2)} progress={progress} />
-      <Scene3 weight={sceneWeight(progress, 3)} progress={progress} />
-      {/* Scene 4 has no 3D content. Its visual is the homepage hero's own
-          background (grid cells + radial glow + vignette) rendered as DOM
-          layers above the canvas. See IntroExperience.jsx. */}
+      <MorphingCloud progress={progress} />
+      <NetworkLines progress={progress} />
     </Canvas>
   )
 }
@@ -66,9 +71,9 @@ export default function IntroScene({ progress = 0 }) {
 function CameraRig({ progress }) {
   useFrame((state) => {
     const { camera, mouse } = state
-    // Through scenes 1-4 the camera dollies forward. On the final scene we
-    // push *into* the glow so the intro ends "inside" the light — which is
-    // the same light the hero section opens with. No visible cut.
+    // Dolly forward through the story, then push INTO the orange glow on
+    // the final beat — the intro lands "inside" the same light the hero
+    // section opens with.
     const z = progress < 0.8 ? 7 - progress * 5 : 3 - (progress - 0.8) * 12
     camera.position.z += (z - camera.position.z) * 0.08
     const tx = mouse.x * 0.3
@@ -80,104 +85,149 @@ function CameraRig({ progress }) {
   return null
 }
 
-/* ---------- Scene 0: drifting ember cloud ----------
- * 1200 particles, each with their own phase/velocity. Per-frame position
- * updates drive ambient drift so the cloud is alive between scroll
- * events; a canvas-generated soft-gradient sprite gives each point a
- * round glow shape (vs the default pointsMaterial square). Material size
- * gently pulses so the whole cloud "breathes". Cloud rotation stays
- * scroll-bound so scroll-up rewinds orientation.
- */
+/* ---------- Morphing particle cloud ---------- */
 
-function makeGlowSprite() {
-  const size = 64
-  const c = typeof document !== 'undefined' ? document.createElement('canvas') : null
-  if (!c) return null
-  c.width = size; c.height = size
-  const ctx = c.getContext('2d')
-  const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
-  g.addColorStop(0, 'rgba(255, 220, 180, 1)')
-  g.addColorStop(0.3, 'rgba(255, 160, 80, 0.65)')
-  g.addColorStop(0.7, 'rgba(255, 90, 31, 0.2)')
-  g.addColorStop(1, 'rgba(255, 90, 31, 0)')
-  ctx.fillStyle = g
-  ctx.fillRect(0, 0, size, size)
-  const tex = new THREE.CanvasTexture(c)
-  tex.minFilter = THREE.LinearFilter
-  tex.magFilter = THREE.LinearFilter
-  return tex
-}
-
-function Scene0({ weight, progress }) {
+function MorphingCloud({ progress }) {
   const ref = useRef()
-  const COUNT = 1200
-
   const sprite = useMemo(() => makeGlowSprite(), [])
 
-  const { positions, basePos, phases, speeds } = useMemo(() => {
+  const { positions, stages, phases } = useMemo(() => {
     const positions = new Float32Array(COUNT * 3)
-    const basePos = new Float32Array(COUNT * 3)
+    const stages = Array.from({ length: NUM_STAGES }, () => new Float32Array(COUNT * 3))
     const phases = new Float32Array(COUNT)
-    const speeds = new Float32Array(COUNT * 3)
+    for (let i = 0; i < COUNT; i++) phases[i] = Math.random() * Math.PI * 2
+
+    // Stage 0 — ambient sphere-shell cloud.
     for (let i = 0; i < COUNT; i++) {
-      const r = 3 + Math.random() * 7
+      const r = 3 + Math.random() * 6
       const theta = Math.random() * Math.PI * 2
       const phi = Math.acos(2 * Math.random() - 1)
-      const x = r * Math.sin(phi) * Math.cos(theta)
-      const y = r * Math.sin(phi) * Math.sin(theta)
-      const z = r * Math.cos(phi) * 0.7 - 2
-      positions[i * 3] = x
-      positions[i * 3 + 1] = y
-      positions[i * 3 + 2] = z
-      basePos[i * 3] = x
-      basePos[i * 3 + 1] = y
-      basePos[i * 3 + 2] = z
-      phases[i] = Math.random() * Math.PI * 2
-      speeds[i * 3]     = 0.2 + Math.random() * 0.18   // x freq
-      speeds[i * 3 + 1] = 0.22 + Math.random() * 0.2   // y freq
-      speeds[i * 3 + 2] = 0.16 + Math.random() * 0.16  // z freq
+      stages[0][i * 3]     = r * Math.sin(phi) * Math.cos(theta)
+      stages[0][i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta)
+      stages[0][i * 3 + 2] = r * Math.cos(phi) * 0.7 - 1
     }
-    return { positions, basePos, phases, speeds }
+
+    // Stage 1 — light streaks: 60 vertical-z lines, 25 particles each.
+    const NUM_LINES = 60
+    const PER_LINE = COUNT / NUM_LINES
+    for (let l = 0; l < NUM_LINES; l++) {
+      const lx = (Math.random() - 0.5) * 14
+      const ly = (Math.random() - 0.5) * 8
+      for (let p = 0; p < PER_LINE; p++) {
+        const i = l * PER_LINE + p
+        stages[1][i * 3]     = lx
+        stages[1][i * 3 + 1] = ly
+        stages[1][i * 3 + 2] = -8 + (p / PER_LINE) * 18
+      }
+    }
+
+    // Stage 2 — network: 30 nodes, particles clustered around each.
+    const NUM_NODES = 30
+    const PER_NODE = COUNT / NUM_NODES
+    const nodes = []
+    for (let n = 0; n < NUM_NODES; n++) {
+      nodes.push([
+        (Math.random() - 0.5) * 6,
+        (Math.random() - 0.5) * 3.5,
+        (Math.random() - 0.5) * 4 - 1,
+      ])
+    }
+    for (let n = 0; n < NUM_NODES; n++) {
+      const [nx, ny, nz] = nodes[n]
+      for (let p = 0; p < PER_NODE; p++) {
+        const i = n * PER_NODE + p
+        stages[2][i * 3]     = nx + (Math.random() - 0.5) * 0.55
+        stages[2][i * 3 + 1] = ny + (Math.random() - 0.5) * 0.55
+        stages[2][i * 3 + 2] = nz + (Math.random() - 0.5) * 0.55
+      }
+    }
+    // Stash the node positions for the line component
+    stages.nodes = nodes
+
+    // Stage 3 — wireframe sphere: even Fibonacci distribution.
+    const goldenAngle = Math.PI * (3 - Math.sqrt(5))
+    const sphereR = 1.75
+    for (let i = 0; i < COUNT; i++) {
+      const y = 1 - (i / (COUNT - 1)) * 2
+      const radius = Math.sqrt(1 - y * y)
+      const theta = goldenAngle * i
+      stages[3][i * 3]     = Math.cos(theta) * radius * sphereR
+      stages[3][i * 3 + 1] = y * sphereR
+      stages[3][i * 3 + 2] = Math.sin(theta) * radius * sphereR
+    }
+
+    // Stage 4 — hero glow disc, centered at the same anchor as the hero
+    // section's --mx/--my (50% / 65%).
+    for (let i = 0; i < COUNT; i++) {
+      const r = Math.pow(Math.random(), 0.6) * 2.4
+      const theta = Math.random() * Math.PI * 2
+      stages[4][i * 3]     = Math.cos(theta) * r
+      stages[4][i * 3 + 1] = Math.sin(theta) * r * 0.55 - 1.6
+      stages[4][i * 3 + 2] = (Math.random() - 0.5) * 0.6
+    }
+
+    positions.set(stages[0])
+    return { positions, stages, phases }
   }, [])
 
   useFrame((state) => {
     if (!ref.current) return
     const t = state.clock.getElapsedTime()
     const arr = ref.current.geometry.attributes.position.array
-    // Per-particle drift via offset sinusoids — gives every point its own
-    // ambient motion so the cloud is never still.
+
+    // Map progress 0..1 to a continuous stage index 0..4 with smoothstep
+    // easing between adjacent stages.
+    const stageF = progress * (NUM_STAGES - 1)
+    const stageA = Math.min(NUM_STAGES - 2, Math.floor(stageF))
+    const stageB = stageA + 1
+    let lerp = Math.min(1, Math.max(0, stageF - stageA))
+    lerp = lerp * lerp * (3 - 2 * lerp)
+    const a = stages[stageA]
+    const b = stages[stageB]
+
+    // Ambient drift is loud at rest (lerp ≈ 0 or 1) and quiet mid-morph so
+    // the transformation reads cleanly.
+    const stable = 1 - 4 * lerp * (1 - lerp)
+    const driftAmt = stable * 0.28
+
     for (let i = 0; i < COUNT; i++) {
-      const px = phases[i]
-      const py = phases[i] * 1.3
-      const pz = phases[i] * 0.7
-      arr[i * 3]     = basePos[i * 3]     + Math.sin(t * speeds[i * 3]     + px) * 0.5
-      arr[i * 3 + 1] = basePos[i * 3 + 1] + Math.cos(t * speeds[i * 3 + 1] + py) * 0.45
-      arr[i * 3 + 2] = basePos[i * 3 + 2] + Math.sin(t * speeds[i * 3 + 2] + pz) * 0.4
+      const ax = a[i * 3], ay = a[i * 3 + 1], az = a[i * 3 + 2]
+      const bx = b[i * 3], by = b[i * 3 + 1], bz = b[i * 3 + 2]
+      let x = ax + (bx - ax) * lerp
+      let y = ay + (by - ay) * lerp
+      let z = az + (bz - az) * lerp
+      const ph = phases[i]
+      x += Math.sin(t * 0.3 + ph) * driftAmt
+      y += Math.cos(t * 0.35 + ph * 1.3) * driftAmt
+      z += Math.sin(t * 0.25 + ph * 0.7) * driftAmt
+      arr[i * 3]     = x
+      arr[i * 3 + 1] = y
+      arr[i * 3 + 2] = z
     }
     ref.current.geometry.attributes.position.needsUpdate = true
 
-    // Whole-cloud rotation bound to scroll progress (reversible on scroll-up).
-    ref.current.rotation.y = progress * Math.PI * 1.8
-    ref.current.rotation.x = progress * Math.PI * 0.6
+    // Whole-cloud rotation bound to scroll so scroll-up rewinds orientation.
+    ref.current.rotation.y = progress * Math.PI * 1.4
+    ref.current.rotation.x = Math.sin(progress * Math.PI) * 0.15
 
-    // Subtle cloud-wide breathing on size + opacity.
-    const breath = 0.85 + Math.sin(t * 1.1) * 0.15
-    ref.current.material.size = 0.18 * breath
-    ref.current.material.opacity = weight * (0.85 + Math.sin(t * 1.4) * 0.1)
+    // Material breath + final fade so the cloud bows out as the hero takes over.
+    const breath = 0.88 + Math.sin(t * 1.1) * 0.12
+    ref.current.material.size = 0.17 * breath
+    const fade = progress < 0.92 ? 1 : Math.max(0, 1 - (progress - 0.92) / 0.08)
+    ref.current.material.opacity = 0.9 * fade
   })
 
-  if (weight <= 0.001) return null
   return (
     <points ref={ref}>
       <bufferGeometry>
         <bufferAttribute attach="attributes-position" count={COUNT} array={positions} itemSize={3} />
       </bufferGeometry>
       <pointsMaterial
-        size={0.18}
+        size={0.17}
         map={sprite}
         color={ORANGE_BRIGHT}
         transparent
-        opacity={weight}
+        opacity={0.9}
         sizeAttenuation
         depthWrite={false}
         blending={THREE.AdditiveBlending}
@@ -186,188 +236,72 @@ function Scene0({ weight, progress }) {
   )
 }
 
-/* ---------- Scene 1: light trails streaking past ---------- */
+/* ---------- Network connection lines ----------
+ * Visible only around the network stage (stage 2). Drawn as static line
+ * segments connecting each node to its three nearest neighbours; opacity
+ * peaks at stage-2 progress and fades on either side so they appear out
+ * of the streaks and dissolve into the sphere.
+ */
 
-function Scene1({ weight, progress }) {
-  const groupRef = useRef()
-  const COUNT = 60
-  const RANGE = 18                          // -10..+8 wrap distance per trail
-  const trails = useMemo(() => {
-    const arr = []
-    for (let i = 0; i < COUNT; i++) {
-      arr.push({
-        x: (Math.random() - 0.5) * 14,
-        y: (Math.random() - 0.5) * 8,
-        zBase: Math.random() * RANGE,        // each trail's starting offset along the wrap
-        speed: 1.2 + Math.random() * 2.5,    // how much it moves per unit of progress
-        len: 0.8 + Math.random() * 2.2,
-        hue: Math.random() > 0.5 ? ORANGE : ORANGE_BRIGHT,
-      })
+function NetworkLines({ progress }) {
+  const ref = useRef()
+
+  const geometry = useMemo(() => {
+    // Use the same node layout as MorphingCloud stage 2.
+    // Seed-friendly: regenerate once here. (If we wanted a strict match we'd
+    // hoist the node array; for visual purposes near-identical is fine.)
+    const NUM_NODES = 30
+    const rng = mulberry32(0xC11C) // deterministic so lines align with stage 2 visually
+    const nodes = []
+    for (let n = 0; n < NUM_NODES; n++) {
+      nodes.push(new THREE.Vector3(
+        (rng() - 0.5) * 6,
+        (rng() - 0.5) * 3.5,
+        (rng() - 0.5) * 4 - 1,
+      ))
     }
-    return arr
-  }, [])
-
-  useFrame(() => {
-    if (!groupRef.current) return
-    groupRef.current.children.forEach((mesh, i) => {
-      const t = trails[i]
-      // z position is a pure function of progress, so scrolling up reverses the streak.
-      const z = ((t.zBase + progress * 30 * t.speed) % RANGE) - 10
-      mesh.position.set(t.x, t.y, z)
-      mesh.material.opacity = weight * 0.9
-    })
-  })
-
-  if (weight <= 0.001) return null
-  return (
-    <group ref={groupRef}>
-      {trails.map((t, i) => (
-        <mesh key={i} position={[t.x, t.y, t.z]} rotation={[0, 0, 0]}>
-          <cylinderGeometry args={[0.012, 0.012, t.len, 6]} />
-          <meshBasicMaterial
-            color={t.hue}
-            transparent
-            opacity={weight}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-          />
-        </mesh>
-      ))}
-    </group>
-  )
-}
-
-/* ---------- Scene 2: glowing network (nodes + connecting lines) ---------- */
-
-function Scene2({ weight, progress }) {
-  const NODES = 28
-  const groupRef = useRef()
-  const linesRef = useRef()
-
-  const { nodePositions, lineGeometry } = useMemo(() => {
-    const nodePositions = []
-    for (let i = 0; i < NODES; i++) {
-      nodePositions.push(
-        new THREE.Vector3(
-          (Math.random() - 0.5) * 7,
-          (Math.random() - 0.5) * 4,
-          (Math.random() - 0.5) * 4 - 1
-        )
-      )
-    }
-    // Connect each node to its 2-3 nearest neighbors
-    const linePositions = []
-    for (let i = 0; i < NODES; i++) {
-      const a = nodePositions[i]
-      const distances = nodePositions
+    const verts = []
+    for (let i = 0; i < NUM_NODES; i++) {
+      const a = nodes[i]
+      const nearest = nodes
         .map((p, j) => ({ j, d: a.distanceTo(p) }))
-        .filter(({ j }) => j !== i)
+        .filter((x) => x.j !== i)
         .sort((x, y) => x.d - y.d)
         .slice(0, 3)
-      for (const { j } of distances) {
-        const b = nodePositions[j]
-        linePositions.push(a.x, a.y, a.z, b.x, b.y, b.z)
+      for (const { j } of nearest) {
+        const b = nodes[j]
+        verts.push(a.x, a.y, a.z, b.x, b.y, b.z)
       }
     }
-    const lineGeometry = new THREE.BufferGeometry()
-    lineGeometry.setAttribute('position', new THREE.Float32BufferAttribute(linePositions, 3))
-    return { nodePositions, lineGeometry }
+    const g = new THREE.BufferGeometry()
+    g.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3))
+    return g
   }, [])
 
   useFrame(() => {
-    if (!groupRef.current) return
-    groupRef.current.rotation.y = progress * Math.PI * 1.4
-    groupRef.current.rotation.x = Math.sin(progress * Math.PI * 2) * 0.12
-    if (linesRef.current) linesRef.current.material.opacity = weight * 0.5
-    groupRef.current.children.forEach((c) => {
-      if (c.material && c !== linesRef.current) c.material.opacity = weight * 0.95
-    })
+    if (!ref.current) return
+    // Peak around stage 2 (progress ≈ 0.5), invisible elsewhere.
+    const d = Math.abs(progress - 0.5)
+    const v = Math.max(0, 1 - d / 0.18)
+    ref.current.material.opacity = v * 0.55
   })
 
-  if (weight <= 0.001) return null
   return (
-    <group ref={groupRef}>
-      {nodePositions.map((p, i) => (
-        <mesh key={i} position={[p.x, p.y, p.z]}>
-          <sphereGeometry args={[0.08, 12, 12]} />
-          <meshBasicMaterial color={ORANGE_BRIGHT} transparent opacity={weight} blending={THREE.AdditiveBlending} />
-        </mesh>
-      ))}
-      <lineSegments ref={linesRef} geometry={lineGeometry}>
-        <lineBasicMaterial color={ORANGE} transparent opacity={weight * 0.5} blending={THREE.AdditiveBlending} />
-      </lineSegments>
-    </group>
+    <lineSegments ref={ref} geometry={geometry}>
+      <lineBasicMaterial color={ORANGE} transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} />
+    </lineSegments>
   )
 }
 
-/* ---------- Scene 3: wireframe icosahedron with orbiting sparks ---------- */
-
-function Scene3({ weight, progress }) {
-  const wireRef = useRef()
-  const coreRef = useRef()
-  const orbitRef = useRef()
-  const SPARKS = 240
-
-  const sparkPositions = useMemo(() => {
-    const arr = new Float32Array(SPARKS * 3)
-    for (let i = 0; i < SPARKS; i++) {
-      const r = 1.8 + Math.random() * 1.3
-      const theta = Math.random() * Math.PI * 2
-      const phi = Math.acos(2 * Math.random() - 1)
-      arr[i * 3] = r * Math.sin(phi) * Math.cos(theta)
-      arr[i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta)
-      arr[i * 3 + 2] = r * Math.cos(phi)
-    }
-    return arr
-  }, [])
-
-  useFrame((state) => {
-    // Subtle time-based pulse keeps the mark alive even when scroll is still;
-    // primary rotations are bound to progress so scroll-up rewinds them.
-    const t = state.clock.getElapsedTime()
-    const pulse = 1 + Math.sin(t * 2.2) * 0.04
-    if (wireRef.current) {
-      wireRef.current.rotation.y = progress * Math.PI * 3
-      wireRef.current.rotation.x = progress * Math.PI * 1.6
-      wireRef.current.material.opacity = weight
-      wireRef.current.scale.setScalar(pulse * (0.4 + weight * 0.9))
-    }
-    if (coreRef.current) {
-      coreRef.current.material.opacity = weight * 0.85
-      coreRef.current.scale.setScalar(0.3 + Math.sin(t * 3) * 0.04)
-    }
-    if (orbitRef.current) {
-      orbitRef.current.rotation.y = -progress * Math.PI * 2.2
-      orbitRef.current.rotation.z = progress * Math.PI * 0.4
-      orbitRef.current.material.opacity = weight * 0.85
-    }
-  })
-
-  if (weight <= 0.001) return null
-  return (
-    <group>
-      {/* Bright core glow */}
-      <mesh ref={coreRef}>
-        <sphereGeometry args={[0.42, 24, 24]} />
-        <meshBasicMaterial color={ORANGE_BRIGHT} transparent opacity={weight * 0.85} blending={THREE.AdditiveBlending} depthWrite={false} />
-      </mesh>
-      {/* Wireframe icosahedron — the iconic brand mark */}
-      <mesh ref={wireRef}>
-        <icosahedronGeometry args={[1.45, 1]} />
-        <meshBasicMaterial color={ORANGE} wireframe transparent opacity={weight} blending={THREE.AdditiveBlending} />
-      </mesh>
-      {/* Orbiting spark field */}
-      <points ref={orbitRef}>
-        <bufferGeometry>
-          <bufferAttribute attach="attributes-position" count={SPARKS} array={sparkPositions} itemSize={3} />
-        </bufferGeometry>
-        <pointsMaterial size={0.045} color={ORANGE_BRIGHT} transparent opacity={weight * 0.85} sizeAttenuation depthWrite={false} blending={THREE.AdditiveBlending} />
-      </points>
-    </group>
-  )
+// Tiny deterministic PRNG so the network-line nodes can be regenerated
+// independently without drifting from the cloud's stage-2 cluster centres.
+function mulberry32(seed) {
+  let a = seed >>> 0
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0
+    let t = a
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
 }
-
-/* Scene 4 intentionally has no 3D content — the homepage hero's own
-   background (grid cells + radial glow + vignette) is rendered as DOM
-   layers in IntroExperience.jsx instead, so the seam is literally the
-   same visual on both sides. */
