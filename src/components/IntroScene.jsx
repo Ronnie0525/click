@@ -50,11 +50,11 @@ export default function IntroScene({ progress = 0 }) {
 
       <CameraRig progress={progress} />
 
-      <Scene0 weight={sceneWeight(progress, 0)} />
-      <Scene1 weight={sceneWeight(progress, 1)} />
+      <Scene0 weight={sceneWeight(progress, 0)} progress={progress} />
+      <Scene1 weight={sceneWeight(progress, 1)} progress={progress} />
       <Scene2 weight={sceneWeight(progress, 2)} progress={progress} />
-      <Scene3 weight={sceneWeight(progress, 3)} />
-      <Scene4 weight={sceneWeight(progress, 4)} />
+      <Scene3 weight={sceneWeight(progress, 3)} progress={progress} />
+      <Scene4 weight={sceneWeight(progress, 4)} progress={progress} />
     </Canvas>
   )
 }
@@ -79,7 +79,7 @@ function CameraRig({ progress }) {
 
 /* ---------- Scene 0: drifting particle cloud ---------- */
 
-function Scene0({ weight }) {
+function Scene0({ weight, progress }) {
   const ref = useRef()
   const COUNT = 1200
   const { positions, sizes } = useMemo(() => {
@@ -97,10 +97,11 @@ function Scene0({ weight }) {
     return { positions, sizes }
   }, [])
 
-  useFrame((_, dt) => {
+  useFrame(() => {
     if (!ref.current) return
-    ref.current.rotation.y += dt * 0.05
-    ref.current.rotation.x += dt * 0.015
+    // Rotation bound to global progress so scrolling up rewinds the spin.
+    ref.current.rotation.y = progress * Math.PI * 1.8
+    ref.current.rotation.x = progress * Math.PI * 0.6
     ref.current.material.opacity = weight * 0.95
   })
 
@@ -126,17 +127,18 @@ function Scene0({ weight }) {
 
 /* ---------- Scene 1: light trails streaking past ---------- */
 
-function Scene1({ weight }) {
+function Scene1({ weight, progress }) {
   const groupRef = useRef()
   const COUNT = 60
+  const RANGE = 18                          // -10..+8 wrap distance per trail
   const trails = useMemo(() => {
     const arr = []
     for (let i = 0; i < COUNT; i++) {
       arr.push({
         x: (Math.random() - 0.5) * 14,
         y: (Math.random() - 0.5) * 8,
-        z: -10 + Math.random() * 14,
-        speed: 6 + Math.random() * 8,
+        zBase: Math.random() * RANGE,        // each trail's starting offset along the wrap
+        speed: 1.2 + Math.random() * 2.5,    // how much it moves per unit of progress
         len: 0.8 + Math.random() * 2.2,
         hue: Math.random() > 0.5 ? ORANGE : ORANGE_BRIGHT,
       })
@@ -144,17 +146,13 @@ function Scene1({ weight }) {
     return arr
   }, [])
 
-  useFrame((_, dt) => {
+  useFrame(() => {
     if (!groupRef.current) return
     groupRef.current.children.forEach((mesh, i) => {
       const t = trails[i]
-      t.z += t.speed * dt
-      if (t.z > 6) {
-        t.z = -10
-        t.x = (Math.random() - 0.5) * 14
-        t.y = (Math.random() - 0.5) * 8
-      }
-      mesh.position.set(t.x, t.y, t.z)
+      // z position is a pure function of progress, so scrolling up reverses the streak.
+      const z = ((t.zBase + progress * 30 * t.speed) % RANGE) - 10
+      mesh.position.set(t.x, t.y, z)
       mesh.material.opacity = weight * 0.9
     })
   })
@@ -215,10 +213,10 @@ function Scene2({ weight, progress }) {
     return { nodePositions, lineGeometry }
   }, [])
 
-  useFrame((_, dt) => {
+  useFrame(() => {
     if (!groupRef.current) return
-    groupRef.current.rotation.y += dt * 0.12
-    groupRef.current.rotation.x = Math.sin(progress * Math.PI * 2) * 0.08
+    groupRef.current.rotation.y = progress * Math.PI * 1.4
+    groupRef.current.rotation.x = Math.sin(progress * Math.PI * 2) * 0.12
     if (linesRef.current) linesRef.current.material.opacity = weight * 0.5
     groupRef.current.children.forEach((c) => {
       if (c.material && c !== linesRef.current) c.material.opacity = weight * 0.95
@@ -243,7 +241,7 @@ function Scene2({ weight, progress }) {
 
 /* ---------- Scene 3: wireframe icosahedron with orbiting sparks ---------- */
 
-function Scene3({ weight }) {
+function Scene3({ weight, progress }) {
   const wireRef = useRef()
   const coreRef = useRef()
   const orbitRef = useRef()
@@ -262,12 +260,14 @@ function Scene3({ weight }) {
     return arr
   }, [])
 
-  useFrame((state, dt) => {
+  useFrame((state) => {
+    // Subtle time-based pulse keeps the mark alive even when scroll is still;
+    // primary rotations are bound to progress so scroll-up rewinds them.
     const t = state.clock.getElapsedTime()
     const pulse = 1 + Math.sin(t * 2.2) * 0.04
     if (wireRef.current) {
-      wireRef.current.rotation.y += dt * 0.35
-      wireRef.current.rotation.x += dt * 0.18
+      wireRef.current.rotation.y = progress * Math.PI * 3
+      wireRef.current.rotation.x = progress * Math.PI * 1.6
       wireRef.current.material.opacity = weight
       wireRef.current.scale.setScalar(pulse * (0.4 + weight * 0.9))
     }
@@ -276,8 +276,8 @@ function Scene3({ weight }) {
       coreRef.current.scale.setScalar(0.3 + Math.sin(t * 3) * 0.04)
     }
     if (orbitRef.current) {
-      orbitRef.current.rotation.y -= dt * 0.25
-      orbitRef.current.rotation.z += dt * 0.05
+      orbitRef.current.rotation.y = -progress * Math.PI * 2.2
+      orbitRef.current.rotation.z = progress * Math.PI * 0.4
       orbitRef.current.material.opacity = weight * 0.85
     }
   })
@@ -308,7 +308,7 @@ function Scene3({ weight }) {
 
 /* ---------- Scene 4: soft lens flare / haze for the final beat ---------- */
 
-function Scene4({ weight }) {
+function Scene4({ weight, progress }) {
   const haloRef = useRef()
   const sparksRef = useRef()
   const COUNT = 600
@@ -324,13 +324,13 @@ function Scene4({ weight }) {
     return arr
   }, [])
 
-  useFrame((_, dt) => {
+  useFrame(() => {
     if (haloRef.current) {
-      haloRef.current.rotation.z += dt * 0.1
+      haloRef.current.rotation.z = progress * Math.PI * 0.8
       haloRef.current.material.opacity = weight * 0.55
     }
     if (sparksRef.current) {
-      sparksRef.current.rotation.z -= dt * 0.04
+      sparksRef.current.rotation.z = -progress * Math.PI * 0.4
       sparksRef.current.material.opacity = weight
     }
   })
