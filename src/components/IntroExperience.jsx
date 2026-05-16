@@ -111,10 +111,13 @@ export default function IntroExperience() {
   useEffect(() => {
     if (phase === 'intro') {
       const lastTouch = { y: null }
+      // Calibration: 5 scenes × ~3 wheel ticks per scene = ~15 ticks to clear
+      // the intro. With a typical wheel delta of ~100px, that means each tick
+      // should move progress by ~1/15 = ~0.066, so the multiplier is ~0.00066.
       const onWheel = (e) => {
         e.preventDefault()
         const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY
-        setProgress((p) => p + dy * 0.0011)
+        setProgress((p) => p + dy * 0.00065)
       }
       const onTouchStart = (e) => { lastTouch.y = e.touches[0].clientY }
       const onTouchMove = (e) => {
@@ -123,15 +126,15 @@ export default function IntroExperience() {
         const y = e.touches[0].clientY
         const dy = lastTouch.y - y
         lastTouch.y = y
-        setProgress((p) => p + dy * 0.0025)
+        setProgress((p) => p + dy * 0.0011)
       }
       const onTouchEnd = () => { lastTouch.y = null }
       const onKey = (e) => {
         if (e.key === 'Escape') dismiss()
         else if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
-          e.preventDefault(); setProgress((p) => p + 0.08)
+          e.preventDefault(); setProgress((p) => p + 0.055)
         } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
-          e.preventDefault(); setProgress((p) => p - 0.08)
+          e.preventDefault(); setProgress((p) => p - 0.055)
         }
       }
       window.addEventListener('wheel', onWheel, { passive: false })
