@@ -60,14 +60,21 @@ export default function IntroExperience() {
 
   // Reflect reveal state on the document root so the site shell can react
   // via CSS variables (no prop-drilling into Home/Navbar).
+  //   --intro-reveal:  raw 0..1 — drives the hero's scale (smooth throughout)
+  //   --hero-opacity:  delayed 0..1 — hero content stays hidden until the
+  //                    intro text has fully faded out, preventing the two
+  //                    titles from overlapping mid-reveal
+  const heroOpacity = Math.max(0, Math.min(1, (revealAmount - 0.45) / 0.5))
   useEffect(() => {
     document.documentElement.style.setProperty('--intro-reveal', String(revealAmount))
+    document.documentElement.style.setProperty('--hero-opacity', String(heroOpacity))
     document.documentElement.style.setProperty('--intro-active', phase === 'intro' ? '1' : '0')
     return () => {
       document.documentElement.style.removeProperty('--intro-reveal')
+      document.documentElement.style.removeProperty('--hero-opacity')
       document.documentElement.style.removeProperty('--intro-active')
     }
-  }, [revealAmount, phase])
+  }, [revealAmount, heroOpacity, phase])
 
   // Cursor tracking — the seam glow follows the cursor with the same formula
   // the hero uses, so when the overlay fades to reveal the hero, the orange
@@ -295,7 +302,9 @@ export default function IntroExperience() {
           <div
             key={i}
             className={`intro__scene ${i === active ? 'is-active' : ''}`}
-            style={{ opacity: i === active ? 1 - revealAmount * 0.6 : 0 }}
+            // Fast fade: intro text is fully gone by the time the hero begins
+            // to appear (revealAmount ~0.45), so the two titles never overlap.
+            style={{ opacity: i === active ? Math.max(0, 1 - revealAmount * 2.4) : 0 }}
           >
             <h2 className="intro__text">{renderHighlights(scene.text)}</h2>
             {scene.sub && <p className="intro__sub">{scene.sub}</p>}
