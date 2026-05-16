@@ -1,5 +1,5 @@
 import { Routes, Route, useLocation } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import Navbar from './components/Navbar.jsx'
 import Footer from './components/Footer.jsx'
 import IntroExperience from './components/IntroExperience.jsx'
@@ -11,54 +11,46 @@ import Contact from './pages/Contact.jsx'
 
 const INTRO_FLAG = 'clickIntroSeen'
 
+/**
+ * On route change:
+ *  - Off the homepage: jump to top (no intro on those routes).
+ *  - On the homepage: first session visit lands at the top of the intro;
+ *    subsequent visits skip past it to the site (the user can still scroll
+ *    back up to replay the intro).
+ */
 function ScrollToTop() {
   const { pathname } = useLocation()
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'instant' })
+    if (pathname !== '/') {
+      window.scrollTo({ top: 0, behavior: 'instant' })
+      return
+    }
+    const seen = (() => {
+      try { return sessionStorage.getItem(INTRO_FLAG) === 'true' } catch { return false }
+    })()
+    // Defer one frame so the Intro container has measured its 500vh height.
+    requestAnimationFrame(() => {
+      if (seen) {
+        const intro = document.querySelector('.intro')
+        const top = intro ? intro.offsetHeight : 0
+        window.scrollTo({ top, behavior: 'instant' })
+      } else {
+        window.scrollTo({ top: 0, behavior: 'instant' })
+      }
+    })
   }, [pathname])
   return null
 }
 
-function readIntroSeen() {
-  if (typeof window === 'undefined') return true
-  try {
-    return sessionStorage.getItem(INTRO_FLAG) === 'true'
-  } catch {
-    return true
-  }
-}
-
 export default function App() {
   const { pathname } = useLocation()
-  // Only run the intro on the homepage. Deep links (/about, /services, etc.)
-  // skip it so shared URLs land where the visitor expected.
-  const introEligible = pathname === '/'
-  const [introSeen, setIntroSeen] = useState(() => readIntroSeen())
-
-  const showIntro = introEligible && !introSeen
-
-  // While intro is mounted, hide the main shell from the a11y tree.
-  useEffect(() => {
-    if (showIntro) {
-      document.body.classList.add('intro-active')
-    } else {
-      document.body.classList.remove('intro-active')
-    }
-    return () => document.body.classList.remove('intro-active')
-  }, [showIntro])
-
-  const completeIntro = () => {
-    try { sessionStorage.setItem(INTRO_FLAG, 'true') } catch { /* noop */ }
-    setIntroSeen(true)
-    // Reset scroll so the homepage starts at the top, not 5 screens deep.
-    window.scrollTo({ top: 0, behavior: 'instant' })
-  }
+  const showIntro = pathname === '/'
 
   return (
     <>
       <ScrollToTop />
-      {showIntro && <IntroExperience onComplete={completeIntro} />}
-      <div className="site-shell" aria-hidden={showIntro ? 'true' : 'false'}>
+      {showIntro && <IntroExperience />}
+      <div className="site-shell">
         <Navbar />
         <main>
           <Routes>
