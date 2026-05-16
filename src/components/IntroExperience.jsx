@@ -189,7 +189,13 @@ export default function IntroExperience() {
       style={{ '--intro-overlay-opacity': phase === 'done' ? 0 : 1 - revealAmount }}
     >
       <div className="intro__stage">
-        <div className="intro__scene-3d" aria-hidden="true">
+        {/* The 3D canvas fades out as we approach scene 5 so it doesn't fight
+            the hero-matching backdrop layered above. */}
+        <div
+          className="intro__scene-3d"
+          aria-hidden="true"
+          style={{ opacity: Math.max(0, 1 - Math.max(0, (progress - 0.74) / 0.18)) }}
+        >
           <Suspense fallback={null}>
             <IntroScene progress={progress} />
           </Suspense>
@@ -199,10 +205,21 @@ export default function IntroExperience() {
         <div className="intro__glow intro__glow--a" aria-hidden="true" />
         <div className="intro__glow intro__glow--b" aria-hidden="true" />
 
-        {/* Hero-matching radial glow — ramps in during the reveal window so
-            scene 5's light is the same light the homepage opens with. */}
+        {/* Hero-matching backdrop — grid cells, radial backlight, and vignette,
+            ramped in during scene 5 so the visual becomes literally the same
+            thing the homepage hero shows. */}
+        <div
+          className="intro__seam-cells"
+          aria-hidden="true"
+          style={{ opacity: Math.min(1, Math.max(0, (progress - 0.74) / 0.22)) }}
+        />
         <div
           className="intro__seam-glow"
+          aria-hidden="true"
+          style={{ opacity: Math.min(1, Math.max(0, (progress - 0.74) / 0.22)) }}
+        />
+        <div
+          className="intro__seam-vignette"
           aria-hidden="true"
           style={{ opacity: Math.min(1, Math.max(0, (progress - 0.78) / 0.22)) }}
         />

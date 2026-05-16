@@ -60,6 +60,36 @@
     linear-gradient(180deg, rgba(0, 0, 0, 0.45) 0%, rgba(0, 0, 0, 0) 25%, rgba(0, 0, 0, 0) 75%, rgba(0, 0, 0, 0.45) 100%);
 }
 
+/* ---------- Hero backdrop handoff (scene 5) ----------
+ * These three layers are pixel-equivalents of the homepage hero's
+ * .hero__bg-cells, .hero__bg-glow, .hero__bg-vignette so that when
+ * the intro overlay fades, what was on screen IS the hero backdrop.
+ * Opacities are driven inline by IntroExperience based on scroll
+ * progress.
+ */
+.intro__seam-cells {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  /* 88×88 tile with an 84×84 rounded-rect #050505 fill inside — the 2px
+     margin on every side stays transparent so the radial glow underneath
+     shines through the lattice (this is exactly the hero's effect). */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='88' height='88'><rect x='2' y='2' width='84' height='84' rx='8' ry='8' fill='%23050505'/></svg>");
+  background-size: 88px 88px;
+  background-repeat: repeat;
+  background-position: -1px -1px;
+}
+.intro__seam-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 60% 70% at 0% 30%, rgba(5, 5, 5, 0.55), transparent 70%),
+    linear-gradient(180deg, transparent 60%, var(--bg) 100%);
+}
+
 /* ---------- Hero-glow handoff layer ----------
  * Sits above the 3D canvas and below the text. Opacity is driven by an
  * inline style based on scroll progress so it ramps in only on the final
