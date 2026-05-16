@@ -1,4 +1,4 @@
-import { useStaggerHeading, useParallaxImage, useRevealOnScroll } from '../hooks/useScrollReveal.js'
+import { useParallaxImage, useRevealOnScroll } from '../hooks/useScrollReveal.js'
 import './WorkShowcase.css'
 
 /**
@@ -48,13 +48,12 @@ const WORK = [
 ]
 
 export default function WorkShowcase() {
-  const headingRef = useStaggerHeading()
   return (
     <section className="section work-showcase">
       <div className="container">
         <div className="section-head work-showcase__head">
           <span className="eyebrow">Selected work</span>
-          <h2 ref={headingRef}>
+          <h2>
             Real outcomes for ambitious UAE brands.
           </h2>
           <p>
