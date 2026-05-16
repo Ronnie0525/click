@@ -24,7 +24,7 @@ const ORANGE = '#FF7A00'
 const ORANGE_BRIGHT = '#FFD2A0'
 const DEEP = '#C93600'
 
-const COUNT = 1500
+const COUNT = 800
 const NUM_STAGES = 5
 
 function makeGlowSprite() {
@@ -73,11 +73,26 @@ export default function IntroScene({ progress = 0 }) {
 function CameraRig({ progress }) {
   useFrame((state) => {
     const { camera, mouse } = state
-    // Dolly forward through the story, then push INTO the orange glow on
-    // the final beat — the intro lands "inside" the same light the hero
-    // section opens with.
-    const z = progress < 0.8 ? 7 - progress * 5 : 3 - (progress - 0.8) * 12
-    camera.position.z += (z - camera.position.z) * 0.08
+    // Recompute the morph activity so the camera reacts in lockstep with
+    // the cloud: pulls back during a transition (so the whole form change
+    // is visible at once) and pushes back in when the cloud settles on a
+    // stage (so the form reads clearly).
+    const stageF = progress * (NUM_STAGES - 1)
+    const segT = Math.min(1, Math.max(0, stageF - Math.floor(stageF)))
+    let lerp
+    if (segT < 0.2) lerp = 0
+    else if (segT > 0.8) lerp = 1
+    else lerp = 1 - Math.pow(1 - (segT - 0.2) / 0.6, 3)
+    const morphActivity = 4 * lerp * (1 - lerp)
+
+    // Base dolly: forward through the story, then push INTO the orange
+    // glow on the final beat (the intro lands inside the hero light).
+    const baseZ = progress < 0.8 ? 7 - progress * 5 : 3 - (progress - 0.8) * 12
+    // Pull back during morphs by up to ~2 units so the camera "reveals"
+    // the transformation, then comes back in.
+    const z = baseZ + morphActivity * 2.0
+    camera.position.z += (z - camera.position.z) * 0.12
+
     const tx = mouse.x * 0.3
     const ty = mouse.y * 0.2
     camera.position.x += (tx - camera.position.x) * 0.04
@@ -227,12 +242,13 @@ function MorphingCloud({ progress }) {
     ref.current.rotation.y = progress * Math.PI * 1.4
     ref.current.rotation.x = Math.sin(progress * Math.PI) * 0.15
 
-    // Material breath + morph energy burst. Size and opacity both kick up
-    // mid-morph so the transitions register, then settle back at rest.
+    // Material breath + morph energy burst. Particles roughly DOUBLE in
+    // size and opacity at the morph midpoint so the transformation reads
+    // as a visible burst of motion, then settle back to base when at rest.
     const breath = 0.88 + Math.sin(t * 1.1) * 0.12
-    ref.current.material.size = 0.17 * breath * (1 + morphActivity * 0.45)
+    ref.current.material.size = 0.32 * breath * (1 + morphActivity * 1.1)
     const fade = progress < 0.92 ? 1 : Math.max(0, 1 - (progress - 0.92) / 0.08)
-    ref.current.material.opacity = 0.9 * fade * (1 + morphActivity * 0.3)
+    ref.current.material.opacity = 0.95 * fade * (1 + morphActivity * 0.5)
   })
 
   return (
@@ -241,11 +257,11 @@ function MorphingCloud({ progress }) {
         <bufferAttribute attach="attributes-position" count={COUNT} array={positions} itemSize={3} />
       </bufferGeometry>
       <pointsMaterial
-        size={0.17}
+        size={0.32}
         map={sprite}
         color={ORANGE_BRIGHT}
         transparent
-        opacity={0.9}
+        opacity={0.95}
         sizeAttenuation
         depthWrite={false}
         blending={THREE.AdditiveBlending}
@@ -295,7 +311,9 @@ function StreakLines({ progress }) {
     <group ref={ref}>
       {layout.map((s, i) => (
         <mesh key={i} position={[s.x, s.y, 0]} rotation={[Math.PI / 2, 0, 0]}>
-          <cylinderGeometry args={[0.018, 0.018, s.len, 6]} />
+          {/* Wider radius so the streaks read clearly as solid trails of
+              light, not as faint pencil lines. */}
+          <cylinderGeometry args={[0.05, 0.05, s.len, 6]} />
           <meshBasicMaterial
             color={s.bright > 0.8 ? ORANGE_BRIGHT : ORANGE}
             transparent
