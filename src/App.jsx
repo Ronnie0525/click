@@ -15,8 +15,6 @@ function readInitialIntroSeen() {
   if (typeof window === 'undefined') return true
   try {
     if (sessionStorage.getItem(INTRO_FLAG) === 'true') return true
-    // Visitors who've asked the OS for reduced motion get the homepage
-    // directly. Stash the flag so they don't get prompted again this session.
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
       sessionStorage.setItem(INTRO_FLAG, 'true')
       return true
@@ -40,15 +38,12 @@ export default function App() {
   const [introSeen, setIntroSeen] = useState(() => readInitialIntroSeen())
   const [introExiting, setIntroExiting] = useState(false)
 
-  // Intro only fires when landing on the homepage of a fresh session.
   const showIntro = pathname === '/' && !introSeen
 
   const completeIntro = () => {
     if (introExiting) return
     try { sessionStorage.setItem(INTRO_FLAG, 'true') } catch { /* noop */ }
     setIntroExiting(true)
-    // Fade-out lasts 0.6s; after that we unmount the intro and let the
-    // site shell fade in (its own CSS animation handles that).
     window.setTimeout(() => {
       setIntroSeen(true)
       setIntroExiting(false)
@@ -56,24 +51,30 @@ export default function App() {
     }, 600)
   }
 
+  // The intro IS the body scroll while it's mounted (500vh container
+  // pinned by ScrollTrigger). Rendering the site shell in parallel would
+  // give the body double the height, so we swap between them.
   return (
     <>
       <ScrollToTop />
-      <div className="site-shell" data-intro-active={showIntro ? 'true' : 'false'}>
-        <Navbar />
-        <main>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/about" element={<About />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/services" element={<Services />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="*" element={<Home />} />
-          </Routes>
-        </main>
-        <Footer />
-      </div>
-      {showIntro && <IntroMorphExperience onComplete={completeIntro} exiting={introExiting} />}
+      {showIntro ? (
+        <IntroMorphExperience onComplete={completeIntro} exiting={introExiting} />
+      ) : (
+        <div className="site-shell">
+          <Navbar />
+          <main>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/about" element={<About />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/services" element={<Services />} />
+              <Route path="/contact" element={<Contact />} />
+              <Route path="*" element={<Home />} />
+            </Routes>
+          </main>
+          <Footer />
+        </div>
+      )}
     </>
   )
 }

@@ -1,5 +1,9 @@
-import { Suspense, lazy, useCallback, useEffect, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import gsap from 'gsap'
+import { ScrollTrigger } from 'gsap/ScrollTrigger'
 import './IntroExperience.css'
+
+gsap.registerPlugin(ScrollTrigger)
 
 const IntroScene = lazy(() => import('./IntroScene.jsx'))
 
@@ -18,34 +22,74 @@ const SCENES = [
 const HIGHLIGHTS = ['signal', 'audience', 'growth', 'Creativity', 'Click']
 
 /**
- * IntroMorphExperience — full-screen cinematic intro layer that plays
- * before the homepage. The visitor scrolls (wheel / touch / arrow keys)
- * to advance a single `progress` value 0..1; the underlying 3D scene
- * morphs through five distinct visual states (particles → network →
- * sphere → broken sphere → background glow). When progress reaches the
- * final beat the "Enter Website" button appears; clicking it (or the
- * "Skip Intro" button at any time) calls `onComplete`, which the parent
- * App uses to fade the intro out and reveal the homepage.
+ * IntroMorphExperience — pre-homepage cinematic intro. Driven by real
+ * page scroll via GSAP ScrollTrigger:
  *
- * `exiting` is a boolean from the parent — while true the overlay
- * smoothly fades to opacity 0 over 0.6s before being unmounted.
+ *   <div.intro>                500vh tall, in normal document flow
+ *     <div.intro__stage>       100vh, pinned by ScrollTrigger while the
+ *                              user scrolls through the container above
+ *
+ * `progress` is updated continuously by ScrollTrigger.onUpdate as the
+ * user scrolls. Everything visual (3D morph, text fades, button reveal,
+ * progress dots, scroll hint) reads off that single value.
+ *
+ *   onComplete: callback the parent fires when the user clicks Skip
+ *               Intro or Enter Website. Sets sessionStorage, fades the
+ *               overlay out, unmounts the intro.
+ *   exiting:    boolean from the parent — while true the container
+ *               opacity transitions to 0 and we stop responding to
+ *               scroll.
  */
 export default function IntroMorphExperience({ onComplete, exiting = false }) {
+  const containerRef = useRef(null)
+  const stageRef = useRef(null)
   const progressRef = useRef(0)
   const [, force] = useState(0)
   const rerender = useCallback(() => force((n) => n + 1), [])
-
-  const setProgress = useCallback((updater) => {
-    const next = typeof updater === 'function' ? updater(progressRef.current) : updater
-    progressRef.current = Math.min(1, Math.max(0, next))
-    rerender()
-  }, [rerender])
 
   const progress = progressRef.current
   const active = Math.min(SCENES.length - 1, Math.floor(progress * SCENES.length))
   const enterReady = progress >= 0.95
 
-  // Cursor tracking — the stage-4 background glow follows the cursor.
+  // ScrollTrigger: pin the stage to the viewport while the user scrolls
+  // through the 500vh container, and stream progress 0..1 into a ref so
+  // the rest of the component (and the 3D scene) can drive off it.
+  useLayoutEffect(() => {
+    if (exiting) return undefined
+    const container = containerRef.current
+    const stage = stageRef.current
+    if (!container || !stage) return undefined
+
+    const trigger = ScrollTrigger.create({
+      trigger: container,
+      start: 'top top',
+      end: 'bottom bottom',
+      pin: stage,
+      pinSpacing: false,
+      // Mild scrub smooths the progress out so a fast wheel flick doesn't
+      // snap straight through a stage; the morph eases toward the target.
+      scrub: 0.35,
+      onUpdate: (self) => {
+        progressRef.current = self.progress
+        rerender()
+      },
+    })
+
+    return () => {
+      trigger.kill()
+      // Refresh other triggers so the page layout the intro leaves behind
+      // is recalculated cleanly when this one is gone.
+      ScrollTrigger.refresh()
+    }
+  }, [exiting, rerender])
+
+  // Make sure the page is at the top of the intro on mount so the user
+  // experiences the story from scene 1, not mid-way.
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }, [])
+
+  // Cursor tracking — the final-stage background glow follows the cursor.
   useEffect(() => {
     const onMove = (e) => {
       const x = (e.clientX / window.innerWidth) * 100
@@ -57,61 +101,25 @@ export default function IntroMorphExperience({ onComplete, exiting = false }) {
     return () => window.removeEventListener('pointermove', onMove)
   }, [])
 
-  // Lock body scroll while the intro is mounted.
+  // Allow Enter / Escape from the keyboard too so the buttons aren't
+  // the only way out.
   useEffect(() => {
-    const prevOverflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => { document.body.style.overflow = prevOverflow }
-  }, [])
-
-  // Scroll input: wheel / touch / keyboard all funnel into setProgress.
-  // Disabled once `exiting` so a stray wheel tick during the fade-out
-  // doesn't bounce the user back into the story.
-  useEffect(() => {
-    if (exiting) return
-    const lastTouch = { y: null }
-    const onWheel = (e) => {
-      e.preventDefault()
-      const dy = e.deltaMode === 1 ? e.deltaY * 16 : e.deltaY
-      setProgress((p) => p + dy * 0.00065)
-    }
-    const onTouchStart = (e) => { lastTouch.y = e.touches[0].clientY }
-    const onTouchMove = (e) => {
-      if (lastTouch.y == null) return
-      e.preventDefault()
-      const y = e.touches[0].clientY
-      const dy = lastTouch.y - y
-      lastTouch.y = y
-      setProgress((p) => p + dy * 0.0011)
-    }
-    const onTouchEnd = () => { lastTouch.y = null }
     const onKey = (e) => {
+      if (exiting) return
       if (e.key === 'Escape') onComplete?.()
-      else if (e.key === 'ArrowDown' || e.key === 'PageDown' || e.key === ' ') {
-        e.preventDefault(); setProgress((p) => p + 0.055)
-      } else if (e.key === 'ArrowUp' || e.key === 'PageUp') {
-        e.preventDefault(); setProgress((p) => p - 0.055)
-      } else if (e.key === 'Enter' && progressRef.current >= 0.95) {
-        onComplete?.()
-      }
+      else if (e.key === 'Enter' && progressRef.current >= 0.95) onComplete?.()
     }
-    window.addEventListener('wheel', onWheel, { passive: false })
-    window.addEventListener('touchstart', onTouchStart, { passive: false })
-    window.addEventListener('touchmove', onTouchMove, { passive: false })
-    window.addEventListener('touchend', onTouchEnd, { passive: true })
     window.addEventListener('keydown', onKey)
-    return () => {
-      window.removeEventListener('wheel', onWheel)
-      window.removeEventListener('touchstart', onTouchStart)
-      window.removeEventListener('touchmove', onTouchMove)
-      window.removeEventListener('touchend', onTouchEnd)
-      window.removeEventListener('keydown', onKey)
-    }
-  }, [exiting, onComplete, setProgress])
+    return () => window.removeEventListener('keydown', onKey)
+  }, [exiting, onComplete])
 
   return (
-    <div className={`intro ${exiting ? 'intro--exiting' : ''}`} aria-hidden={exiting}>
-      <div className="intro__stage">
+    <div
+      className={`intro ${exiting ? 'intro--exiting' : ''}`}
+      ref={containerRef}
+      aria-hidden={exiting}
+    >
+      <div className="intro__stage" ref={stageRef}>
         <div className="intro__scene-3d" aria-hidden="true">
           <Suspense fallback={null}>
             <IntroScene progress={progress} />
@@ -122,8 +130,6 @@ export default function IntroMorphExperience({ onComplete, exiting = false }) {
         <div className="intro__glow intro__glow--a" aria-hidden="true" />
         <div className="intro__glow intro__glow--b" aria-hidden="true" />
 
-        {/* Cursor-tracked orange wash that ramps in for stage 5's
-            "subtle animated background" beat. */}
         <div
           className="intro__seam-glow"
           aria-hidden="true"
