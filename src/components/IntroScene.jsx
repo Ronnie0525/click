@@ -374,21 +374,26 @@ function generateSpherePairs(n) {
 }
 
 function generateDiscPairs(n) {
-  // Short radial-tangent spokes laid across the hero glow disc at the
-  // same anchor as the homepage hero (centred at y ≈ -1.6).
+  // Sunburst: every line emanates outward from the hero glow anchor
+  // (centred at y ≈ -1.6, matching the homepage hero's --my: 65%).
+  // Evenly spaced around 360° with a little jitter so it doesn't look
+  // mechanically perfect. Inner ends sit just outside the glow's hot
+  // centre; outer ends extend into the glow's falloff so the rays
+  // appear to dissolve into the orange light.
+  const cx = 0
+  const cy = -1.6
+  const ASPECT_Y = 0.55         // squashed vertically to match the hero glow's elliptical look
   const arr = []
   for (let i = 0; i < n; i++) {
-    const r = Math.pow(Math.random(), 0.55) * 2.3
-    const theta = Math.random() * Math.PI * 2
-    const cx = Math.cos(theta) * r
-    const cy = Math.sin(theta) * r * 0.55 - 1.6
-    // Spoke direction = tangent to a circle around centre.
-    const tx = -Math.sin(theta)
-    const ty = Math.cos(theta) * 0.55
-    const half = 0.18
+    const baseAngle = (i / n) * Math.PI * 2
+    const theta = baseAngle + (Math.random() - 0.5) * 0.1
+    const innerR = 0.25 + Math.random() * 0.25
+    const outerR = innerR + 0.8 + Math.random() * 0.9
+    const dx = Math.cos(theta)
+    const dy = Math.sin(theta) * ASPECT_Y
     arr.push({
-      from: new THREE.Vector3(cx - tx * half, cy - ty * half, 0),
-      to:   new THREE.Vector3(cx + tx * half, cy + ty * half, 0),
+      from: new THREE.Vector3(cx + dx * innerR, cy + dy * innerR, 0),
+      to:   new THREE.Vector3(cx + dx * outerR, cy + dy * outerR, 0),
     })
   }
   return arr
