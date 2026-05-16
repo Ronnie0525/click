@@ -221,9 +221,10 @@ function MorphingLines({ progress }) {
       mesh.material.opacity = 0.85 * (1 + morphActivity * 0.4)
     }
 
-    // Whole-rig rotation tied to scroll so scroll-up rewinds orientation.
-    groupRef.current.rotation.y = progress * Math.PI * 1.2
-    groupRef.current.rotation.x = Math.sin(progress * Math.PI) * 0.12
+    // Subtle rotation only — full rotation was twisting the streaks
+    // sideways so they no longer pointed along the camera axis.
+    groupRef.current.rotation.y = progress * Math.PI * 0.35
+    groupRef.current.rotation.x = Math.sin(progress * Math.PI) * 0.06
 
     // Fade away as the intro reveals the hero.
     const fade = progress < 0.92 ? 1 : Math.max(0, 1 - (progress - 0.92) / 0.08)
@@ -239,13 +240,15 @@ function MorphingLines({ progress }) {
     <group ref={groupRef}>
       {Array.from({ length: NUM_LINES }, (_, i) => (
         <mesh key={i} ref={(el) => { meshRefs.current[i] = el }}>
-          {/* Native length 1 along Y — we scale Y to the segment's length
-              and rotate the mesh so Y points along the segment. */}
-          <cylinderGeometry args={[0.045, 0.045, 1, 6]} />
+          {/* Thin, many-segment cylinder so the lines read as glowing
+              beams rather than physical sticks. Native length 1 along
+              Y — we scale Y to the segment's length and rotate so Y
+              points along the segment. */}
+          <cylinderGeometry args={[0.015, 0.015, 1, 10]} />
           <meshBasicMaterial
             color={ORANGE_BRIGHT}
             transparent
-            opacity={0.85}
+            opacity={0.95}
             blending={THREE.AdditiveBlending}
             depthWrite={false}
           />
@@ -300,28 +303,27 @@ function generateStreakPairs(n) {
 }
 
 function generateNetworkPairs(n) {
-  // 30 nodes; each line connects two random-but-not-too-far nodes so the
-  // network reads as a connected web.
-  const NUM_NODES = 30
+  // Compact web — fewer nodes, tighter spread, every line connects to a
+  // nearest neighbour so the result reads as a connected mesh rather than
+  // a scattered pile of edges.
+  const NUM_NODES = 18
   const nodes = []
   for (let i = 0; i < NUM_NODES; i++) {
     nodes.push(new THREE.Vector3(
-      (Math.random() - 0.5) * 6,
-      (Math.random() - 0.5) * 3.5,
-      (Math.random() - 0.5) * 3 - 1,
+      (Math.random() - 0.5) * 3.6,
+      (Math.random() - 0.5) * 2.4,
+      (Math.random() - 0.5) * 2.2 - 0.5,
     ))
   }
   const arr = []
   for (let i = 0; i < n; i++) {
     const aIdx = i % NUM_NODES
-    // Pick the nearest neighbour (with a bit of randomness so the same
-    // edge isn't drawn n / NUM_NODES times).
     const a = nodes[aIdx]
     const candidates = nodes
       .map((p, j) => ({ j, d: a.distanceTo(p) }))
       .filter(({ j }) => j !== aIdx)
       .sort((x, y) => x.d - y.d)
-      .slice(0, 4)
+      .slice(0, 3)                                  // always one of the 3 nearest
     const pick = candidates[Math.floor(Math.random() * candidates.length)]
     arr.push({ from: a.clone(), to: nodes[pick.j].clone() })
   }
