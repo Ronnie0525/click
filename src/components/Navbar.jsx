@@ -78,7 +78,7 @@ export default function Navbar() {
           >
             <button
               type="button"
-              className={`nav__link nav__dropdown-trigger ${dropdown ? 'is-active' : ''}`}
+              className={`nav__link nav__dropdown-trigger ${dropdown ? 'is-active' : ''} ${location.pathname.startsWith('/services') ? 'active' : ''}`}
               onClick={() => setDropdown((v) => !v)}
               aria-expanded={dropdown}
               aria-haspopup="true"
