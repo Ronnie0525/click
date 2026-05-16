@@ -29,11 +29,18 @@
   position: absolute;
   inset: 0;
   z-index: 0;
+  /* The spline-viewer custom element captures mouse + wheel + touch by default
+     (it's built to be orbit-draggable). That swallows scroll and freezes the
+     intro on scene 1. We want it purely decorative, so disable input. */
+  pointer-events: none;
+  touch-action: auto;
 }
 .intro__spline spline-viewer {
   width: 100% !important;
   height: 100% !important;
   display: block;
+  pointer-events: none;
+  touch-action: auto;
   /* let the brand glow shine through subtle parts of the scene */
   filter: saturate(1.05);
 }
