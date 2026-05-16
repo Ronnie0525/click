@@ -1,37 +1,36 @@
 import { Canvas, useFrame } from '@react-three/fiber'
+import { Line } from '@react-three/drei'
+import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
 
 /**
- * IntroScene — two layered systems, particles and a line skeleton, that
- * take turns being dominant across five distinct visual states:
+ * IntroScene — one continuous morph through six visual states. Real
+ * post-processing bloom on top, drei <Line> for proper screen-space
+ * line thickness, sprite-based particles. Same 800 particles + 60
+ * lines persist across the whole intro; only their target positions
+ * change with scroll progress.
  *
- *   stage 0  "Every brand wants attention"       → PARTICLES (cloud)
- *   stage 1  "Attention alone is not enough"     → LINES (streaks)
- *   stage 2  "Strategy turns it into growth"     → LINES (sphere)
- *   stage 3  "Creativity makes brands ..."       → LINES (broken / exploding)
- *   stage 4  "This is Click"                     → PARTICLES (hero glow disc)
- *
- * Each system has its own per-stage target positions; per-frame the
- * positions lerp between the two adjacent stages with a hold pattern
- * (20% rest → 60% ease-out → 20% rest) so the form settles long enough
- * to read. Opacity per stage tells you which layer leads the eye.
+ *   0%   cloud         — particles only
+ *   20%  horizontal    — particles align on x-axis, single bright band
+ *   40%  network       — particles cluster, lines connect them
+ *   60%  sphere        — Fibonacci shell + icosahedron wireframe
+ *   80%  broken        — sphere bursts outward
+ *   100% background    — particles spread, line skeleton gone, hero glow
  */
 
 const ORANGE = '#FF7A00'
 const ORANGE_BRIGHT = '#FFD2A0'
 const DEEP = '#C93600'
 
-const NUM_PARTICLES = 600
+const NUM_PARTICLES = 800
 const NUM_LINES = 60
-const NUM_STAGES = 6                              // 0% 20% 40% 60% 80% 100%
+const NUM_STAGES = 6
 
-// Opacity per visual stage. Particles lead at the bookends, line skeleton
-// leads through line / network / sphere, both contribute to the broken
-// beat as the sphere flies apart.
-//                                cloud  line   net    sphere  broken  bg
-const PARTICLE_OPACITY = [1.00,  0.40,  0.35,  0.15,   0.55,   1.00]
-const LINE_OPACITY     = [0.00,  0.95,  0.95,  0.95,   0.70,   0.00]
+// Per-stage opacity. Particles lead the cloud + background bookends;
+// the line skeleton leads the line/network/sphere/broken beats.
+const PARTICLE_OPACITY = [1.00, 0.45, 0.35, 0.20, 0.55, 1.00]
+const LINE_OPACITY     = [0.00, 1.00, 1.00, 1.00, 0.70, 0.00]
 
 /* ---------- Root ---------- */
 
@@ -42,23 +41,33 @@ export default function IntroScene({ progress = 0 }) {
       gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
       camera={{ position: [0, 0, 7], fov: 55, near: 0.1, far: 100 }}
     >
-      <color attach="background" args={['#040404']} />
-      <fog attach="fog" args={['#040404', 8, 28]} />
-      <ambientLight intensity={0.35} />
-      <pointLight position={[6, 4, 6]} color={ORANGE_BRIGHT} intensity={6} distance={20} />
-      <pointLight position={[-6, -3, 4]} color={DEEP} intensity={4} distance={20} />
+      <color attach="background" args={['#050505']} />
+      <fog attach="fog" args={['#050505', 9, 30]} />
+      <ambientLight intensity={0.3} />
 
       <CameraRig progress={progress} />
       <ParticleField progress={progress} />
-      <LineSkeleton progress={progress} />
+      <LineSystem progress={progress} />
+
+      {/* Real bloom on the bright orange pixels — this is what makes the
+          particles and lines actually look luminous instead of like dots
+          and sticks. */}
+      <EffectComposer disableNormalPass multisampling={0}>
+        <Bloom
+          intensity={1.35}
+          luminanceThreshold={0.08}
+          luminanceSmoothing={0.8}
+          mipmapBlur
+          radius={0.75}
+        />
+      </EffectComposer>
     </Canvas>
   )
 }
 
 /* ---------- Shared stage math ----------
- * Returns the two adjacent stage indices and an eased lerp between them.
- * Hold pattern: lerp stays clamped at 0 / 1 for the first / last 20% of
- * each segment so each form rests visibly before launching to the next.
+ * Hold pattern: first 20% / last 20% of each segment is stationary,
+ * middle 60% is the morph with cubic ease-out.
  */
 function computeStage(progress) {
   const stageF = progress * (NUM_STAGES - 1)
@@ -68,12 +77,12 @@ function computeStage(progress) {
   let lerp
   if (segT < 0.2) lerp = 0
   else if (segT > 0.8) lerp = 1
-  else lerp = 1 - Math.pow(1 - (segT - 0.2) / 0.6, 3)   // ease-out cubic
+  else lerp = 1 - Math.pow(1 - (segT - 0.2) / 0.6, 3)
   const morphActivity = 4 * lerp * (1 - lerp)
   return { stageA, stageB, lerp, morphActivity }
 }
 
-function lerpScalar(a, b, t) { return a + (b - a) * t }
+const lerpScalar = (a, b, t) => a + (b - a) * t
 
 /* ---------- Camera ---------- */
 
@@ -81,22 +90,19 @@ function CameraRig({ progress }) {
   useFrame((state) => {
     const { camera, mouse } = state
     const { morphActivity } = computeStage(progress)
-    const baseZ = progress < 0.8 ? 7 - progress * 5 : 3 - (progress - 0.8) * 12
-    const z = baseZ + morphActivity * 2.0
-    camera.position.z += (z - camera.position.z) * 0.12
-    camera.position.x += (mouse.x * 0.3 - camera.position.x) * 0.04
-    camera.position.y += (mouse.y * 0.2 - camera.position.y) * 0.04
+    // Forward dolly through the story; the camera pulls back when a
+    // morph is in flight so the whole transformation is visible.
+    const baseZ = 7 - progress * 4.5
+    const z = baseZ + morphActivity * 1.6
+    camera.position.z += (z - camera.position.z) * 0.1
+    camera.position.x += (mouse.x * 0.4 - camera.position.x) * 0.04
+    camera.position.y += (mouse.y * 0.25 - camera.position.y) * 0.04
     camera.lookAt(0, 0, 0)
   })
   return null
 }
 
-/* ---------- Particle field ----------
- * 600 soft-glow particles. Leads stages 0 (cloud) and 4 (hero disc); on
- * stages 1–3 it sits in the background at low opacity. The 5 stage
- * arrays let it interpolate continuously so the particles physically
- * move with the morph instead of just fading.
- */
+/* ---------- Particle field ---------- */
 
 function makeGlowSprite() {
   if (typeof document === 'undefined') return null
@@ -105,10 +111,10 @@ function makeGlowSprite() {
   c.width = size; c.height = size
   const ctx = c.getContext('2d')
   const g = ctx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2)
-  g.addColorStop(0, 'rgba(255, 220, 180, 1)')
-  g.addColorStop(0.3, 'rgba(255, 160, 80, 0.7)')
-  g.addColorStop(0.7, 'rgba(255, 90, 31, 0.2)')
-  g.addColorStop(1, 'rgba(255, 90, 31, 0)')
+  g.addColorStop(0,   'rgba(255, 220, 180, 1)')
+  g.addColorStop(0.3, 'rgba(255, 150, 70, 0.7)')
+  g.addColorStop(0.7, 'rgba(255, 90, 31, 0.18)')
+  g.addColorStop(1,   'rgba(255, 90, 31, 0)')
   ctx.fillStyle = g
   ctx.fillRect(0, 0, size, size)
   const tex = new THREE.CanvasTexture(c)
@@ -120,13 +126,14 @@ function makeGlowSprite() {
 function ParticleField({ progress }) {
   const ref = useRef()
   const sprite = useMemo(() => makeGlowSprite(), [])
-  const { positions, stages, phases } = useMemo(() => {
+
+  const { positions, stages, phases, nodes } = useMemo(() => {
     const positions = new Float32Array(NUM_PARTICLES * 3)
     const stages = Array.from({ length: NUM_STAGES }, () => new Float32Array(NUM_PARTICLES * 3))
     const phases = new Float32Array(NUM_PARTICLES)
     for (let i = 0; i < NUM_PARTICLES; i++) phases[i] = Math.random() * Math.PI * 2
 
-    // Stage 0 — scattered sphere-shell cloud.
+    // 0 — sphere-shell cloud
     for (let i = 0; i < NUM_PARTICLES; i++) {
       const r = 3 + Math.random() * 6
       const theta = Math.random() * Math.PI * 2
@@ -135,35 +142,31 @@ function ParticleField({ progress }) {
       stages[0][i * 3 + 1] = r * Math.sin(phi) * Math.sin(theta)
       stages[0][i * 3 + 2] = r * Math.cos(phi) * 0.7 - 1
     }
-    // Stage 1 — particles align into a horizontal line stretched along
-    // the x-axis. Small y/z jitter so it reads as a glowing band rather
-    // than a perfectly sterile strip.
+    // 1 — horizontal band along x
     for (let i = 0; i < NUM_PARTICLES; i++) {
       const t = i / (NUM_PARTICLES - 1)
-      stages[1][i * 3]     = (t - 0.5) * 12
-      stages[1][i * 3 + 1] = (Math.random() - 0.5) * 0.25
-      stages[1][i * 3 + 2] = (Math.random() - 0.5) * 0.4
+      stages[1][i * 3]     = (t - 0.5) * 12 + (Math.random() - 0.5) * 0.15
+      stages[1][i * 3 + 1] = (Math.random() - 0.5) * 0.18
+      stages[1][i * 3 + 2] = (Math.random() - 0.5) * 0.35
     }
-    // Stage 2 — connected network: particles cluster around ~24 node
-    // positions so the line skeleton's network edges look like they're
-    // actually anchoring the particles.
+    // 2 — network nodes (deterministic so the line component aligns)
     const NUM_NODES = 24
+    const rng = mulberry32(0xC11C)
     const nodes = []
     for (let n = 0; n < NUM_NODES; n++) {
       nodes.push([
-        (Math.random() - 0.5) * 5,
-        (Math.random() - 0.5) * 3,
-        (Math.random() - 0.5) * 2.4 - 0.5,
+        (rng() - 0.5) * 5,
+        (rng() - 0.5) * 3,
+        (rng() - 0.5) * 2.4 - 0.5,
       ])
     }
     for (let i = 0; i < NUM_PARTICLES; i++) {
       const n = nodes[i % NUM_NODES]
-      stages[2][i * 3]     = n[0] + (Math.random() - 0.5) * 0.4
-      stages[2][i * 3 + 1] = n[1] + (Math.random() - 0.5) * 0.4
-      stages[2][i * 3 + 2] = n[2] + (Math.random() - 0.5) * 0.4
+      stages[2][i * 3]     = n[0] + (Math.random() - 0.5) * 0.5
+      stages[2][i * 3 + 1] = n[1] + (Math.random() - 0.5) * 0.5
+      stages[2][i * 3 + 2] = n[2] + (Math.random() - 0.5) * 0.5
     }
-    // Stage 3 — Fibonacci-distributed sphere shell. Particles sit on the
-    // same surface as the icosahedron the line skeleton draws.
+    // 3 — Fibonacci sphere shell
     const goldenAngle = Math.PI * (3 - Math.sqrt(5))
     const sphereR = 1.85
     for (let i = 0; i < NUM_PARTICLES; i++) {
@@ -174,29 +177,25 @@ function ParticleField({ progress }) {
       stages[3][i * 3 + 1] = y * sphereR
       stages[3][i * 3 + 2] = Math.sin(theta) * radius * sphereR
     }
-    // Stage 4 — broken / exploded: sphere positions pushed radially
-    // outward by 2-3× so the wireframe visibly bursts apart.
+    // 4 — sphere bursting outward
     for (let i = 0; i < NUM_PARTICLES; i++) {
       const sx = stages[3][i * 3], sy = stages[3][i * 3 + 1], sz = stages[3][i * 3 + 2]
-      const len = Math.sqrt(sx * sx + sy * sy + sz * sz) || 0.001
-      const k = 2.4 + Math.random() * 0.8
-      stages[4][i * 3]     = (sx / len) * len * k
-      stages[4][i * 3 + 1] = (sy / len) * len * k
-      stages[4][i * 3 + 2] = (sz / len) * len * k
+      const k = 2.5 + Math.random() * 0.9
+      stages[4][i * 3]     = sx * k
+      stages[4][i * 3 + 1] = sy * k
+      stages[4][i * 3 + 2] = sz * k
     }
-    // Stage 5 — particles spread outward into an animated background, with
-    // a softer concentration near the hero glow anchor (centred at
-    // y = -1.6 to match the homepage hero's --my: 65%).
+    // 5 — spread background, gentle bias toward the hero glow anchor
     for (let i = 0; i < NUM_PARTICLES; i++) {
-      const r = Math.pow(Math.random(), 0.5) * 4
+      const r = Math.pow(Math.random(), 0.5) * 4.5
       const theta = Math.random() * Math.PI * 2
       stages[5][i * 3]     = Math.cos(theta) * r
-      stages[5][i * 3 + 1] = Math.sin(theta) * r * 0.55 - 1.2
-      stages[5][i * 3 + 2] = (Math.random() - 0.5) * 1.4
+      stages[5][i * 3 + 1] = Math.sin(theta) * r * 0.55 - 1.0
+      stages[5][i * 3 + 2] = (Math.random() - 0.5) * 1.6
     }
 
     positions.set(stages[0])
-    return { positions, stages, phases }
+    return { positions, stages, phases, nodes }
   }, [])
 
   useFrame((state) => {
@@ -207,7 +206,8 @@ function ParticleField({ progress }) {
     const b = stages[stageB]
     const arr = ref.current.geometry.attributes.position.array
 
-    // Drift is loudest at rest, quiet during morph so the form change reads.
+    // Drift is loudest at rest, quiet during morph so the transformation
+    // reads as a deliberate motion not just shimmer.
     const driftAmt = (1 - morphActivity) * 0.22
 
     for (let i = 0; i < NUM_PARTICLES; i++) {
@@ -220,17 +220,12 @@ function ParticleField({ progress }) {
     }
     ref.current.geometry.attributes.position.needsUpdate = true
 
-    // Opacity blends between the per-stage targets — particles dim away
-    // when the line skeleton owns the beat and re-emerge for stage 4.
     const opA = PARTICLE_OPACITY[stageA]
     const opB = PARTICLE_OPACITY[stageB]
     const baseOpacity = lerpScalar(opA, opB, lerp)
-    const breath = 0.9 + Math.sin(t * 1.0) * 0.1
-    ref.current.material.opacity = baseOpacity * breath * (1 + morphActivity * 0.2)
-
-    // Final fade as the seam-glow takes over.
-    const fade = progress < 0.93 ? 1 : Math.max(0, 1 - (progress - 0.93) / 0.07)
-    if (fade < 1) ref.current.material.opacity *= fade
+    const breath = 0.92 + Math.sin(t * 1.0) * 0.08
+    ref.current.material.opacity = baseOpacity * breath * (1 + morphActivity * 0.25)
+    ref.current.material.size = 0.32 * (1 + morphActivity * 0.4)
   })
 
   return (
@@ -239,7 +234,7 @@ function ParticleField({ progress }) {
         <bufferAttribute attach="attributes-position" count={NUM_PARTICLES} array={positions} itemSize={3} />
       </bufferGeometry>
       <pointsMaterial
-        size={0.25}
+        size={0.32}
         map={sprite}
         color={ORANGE_BRIGHT}
         transparent
@@ -252,19 +247,20 @@ function ParticleField({ progress }) {
   )
 }
 
-/* ---------- Line skeleton ----------
- * 60 thin orange "beams" (cylinder core + soft halo). Leads stages
- * 1 (streaks), 2 (sphere), 3 (broken). Invisible at stages 0 and 4 so
- * the particle field is the only thing the eye sees on those beats.
+/* ---------- Line system ----------
+ * 60 drei <Line> components — Line2 internally, so lineWidth is true
+ * screen-space pixels (not the 1px WebGL limit). Each line stores its
+ * own 5-stage targets and lerps endpoints per frame. Bloom does the
+ * heavy lifting on visual luminance.
  */
 
-function LineSkeleton({ progress }) {
+function LineSystem({ progress }) {
   const groupRef = useRef()
-  const meshRefs = useRef([])
+  const lineRefs = useRef([])
 
   const stages = useMemo(() => [
     generateCloudPairs(NUM_LINES),
-    generateHorizontalLinePairs(NUM_LINES),
+    generateHorizontalPairs(NUM_LINES),
     generateNetworkPairs(NUM_LINES),
     generateSpherePairs(NUM_LINES),
     generateBrokenPairs(NUM_LINES),
@@ -274,10 +270,6 @@ function LineSkeleton({ progress }) {
   const tmp = useMemo(() => ({
     from: new THREE.Vector3(),
     to: new THREE.Vector3(),
-    mid: new THREE.Vector3(),
-    dir: new THREE.Vector3(),
-    up: new THREE.Vector3(0, 1, 0),
-    quat: new THREE.Quaternion(),
   }), [])
 
   useFrame(() => {
@@ -285,12 +277,10 @@ function LineSkeleton({ progress }) {
     const { stageA, stageB, lerp, morphActivity } = computeStage(progress)
     const a = stages[stageA]
     const b = stages[stageB]
-
     const opA = LINE_OPACITY[stageA]
     const opB = LINE_OPACITY[stageB]
     const baseOpacity = lerpScalar(opA, opB, lerp)
-    const fade = progress < 0.93 ? 1 : Math.max(0, 1 - (progress - 0.93) / 0.07)
-    const layerOpacity = baseOpacity * fade
+    const layerOpacity = baseOpacity * (1 + morphActivity * 0.3)
 
     for (let i = 0; i < NUM_LINES; i++) {
       const af = a[i].from, at_ = a[i].to
@@ -305,43 +295,29 @@ function LineSkeleton({ progress }) {
         at_.y + (bt.y - at_.y) * lerp,
         at_.z + (bt.z - at_.z) * lerp,
       )
-      tmp.mid.copy(tmp.from).lerp(tmp.to, 0.5)
-      tmp.dir.copy(tmp.to).sub(tmp.from)
-      const length = tmp.dir.length() || 0.001
-      tmp.dir.divideScalar(length)
-      tmp.quat.setFromUnitVectors(tmp.up, tmp.dir)
-
-      const group = meshRefs.current[i]
-      if (!group) continue
-      group.position.copy(tmp.mid)
-      group.quaternion.copy(tmp.quat)
-      group.scale.set(1, length, 1)
-      const core = group.children[0]
-      const halo = group.children[1]
-      if (core?.material) core.material.opacity = layerOpacity * (1 + morphActivity * 0.3)
-      if (halo?.material) halo.material.opacity = layerOpacity * 0.4 * (1 + morphActivity * 0.5)
+      const line = lineRefs.current[i]
+      if (!line) continue
+      // Line2 stores positions on the geometry; setPositions takes a flat
+      // [x,y,z, x,y,z, ...] array.
+      if (line.geometry?.setPositions) {
+        line.geometry.setPositions([tmp.from.x, tmp.from.y, tmp.from.z, tmp.to.x, tmp.to.y, tmp.to.z])
+      }
+      if (line.material) line.material.opacity = layerOpacity
     }
-
-    // Mild rotation only, applied progress > 0.2 so the streak stage isn't
-    // twisted off-axis.
-    const rotProg = Math.max(0, progress - 0.2) / 0.8
-    groupRef.current.rotation.y = rotProg * Math.PI * 0.4
-    groupRef.current.rotation.x = Math.sin(rotProg * Math.PI) * 0.08
   })
 
   return (
     <group ref={groupRef}>
       {Array.from({ length: NUM_LINES }, (_, i) => (
-        <group key={i} ref={(el) => { meshRefs.current[i] = el }}>
-          <mesh>
-            <cylinderGeometry args={[0.012, 0.012, 1, 10]} />
-            <meshBasicMaterial color={ORANGE} transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} />
-          </mesh>
-          <mesh>
-            <cylinderGeometry args={[0.04, 0.04, 1, 8]} />
-            <meshBasicMaterial color={ORANGE} transparent opacity={0} blending={THREE.AdditiveBlending} depthWrite={false} />
-          </mesh>
-        </group>
+        <Line
+          key={i}
+          ref={(el) => { lineRefs.current[i] = el }}
+          points={[[0, 0, 0], [0.01, 0, 0]]}
+          color={ORANGE}
+          lineWidth={2.4}
+          transparent
+          opacity={0}
+        />
       ))}
     </group>
   )
@@ -350,7 +326,6 @@ function LineSkeleton({ progress }) {
 /* ---------- Line stage generators ---------- */
 
 function generateCloudPairs(n) {
-  // Tiny tangents (essentially invisible — opacity is 0 in stage 0).
   const arr = []
   for (let i = 0; i < n; i++) {
     const r = 3 + Math.random() * 5
@@ -361,24 +336,21 @@ function generateCloudPairs(n) {
     const cz = r * Math.cos(phi) * 0.7 - 1
     arr.push({
       from: new THREE.Vector3(cx, cy, cz),
-      to:   new THREE.Vector3(cx + 0.05, cy + 0.05, cz + 0.05),
+      to:   new THREE.Vector3(cx + 0.05, cy, cz),
     })
   }
   return arr
 }
 
-function generateHorizontalLinePairs(n) {
-  // A single bright horizontal line stretched along the x-axis, drawn as
-  // n short overlapping segments so it reads as one continuous glowing
-  // band. Y/z jitter is tiny so the line stays clearly horizontal.
+function generateHorizontalPairs(n) {
   const SPAN = 12
   const arr = []
   for (let i = 0; i < n; i++) {
     const t = i / n
-    const segWidth = (SPAN * 1.05) / n
+    const segWidth = (SPAN * 1.1) / n
     const cx = (t - 0.5) * SPAN
-    const y = (Math.random() - 0.5) * 0.08
-    const z = (Math.random() - 0.5) * 0.2
+    const y = (Math.random() - 0.5) * 0.05
+    const z = (Math.random() - 0.5) * 0.15
     arr.push({
       from: new THREE.Vector3(cx - segWidth / 2, y, z),
       to:   new THREE.Vector3(cx + segWidth / 2, y, z),
@@ -388,10 +360,6 @@ function generateHorizontalLinePairs(n) {
 }
 
 function generateNetworkPairs(n) {
-  // Connected network — same 24-node layout as the particle field's
-  // stage 2 (deterministic PRNG so they align). Each edge connects to
-  // one of the 3 nearest neighbours so the result reads as a coherent
-  // web rather than a pile of sticks.
   const NUM_NODES = 24
   const rng = mulberry32(0xC11C)
   const nodes = []
@@ -417,21 +385,7 @@ function generateNetworkPairs(n) {
   return arr
 }
 
-// Tiny deterministic PRNG used to keep the network's node layout aligned
-// with the particle field's stage-2 cluster centres across both generators.
-function mulberry32(seed) {
-  let a = seed >>> 0
-  return () => {
-    a = (a + 0x6D2B79F5) >>> 0
-    let t = a
-    t = Math.imul(t ^ (t >>> 15), t | 1)
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
-  }
-}
-
 function generateSpherePairs(n) {
-  // Icosahedron edges — clean wireframe sphere look.
   const geo = new THREE.IcosahedronGeometry(1.85, 1)
   const edges = new THREE.EdgesGeometry(geo, 1)
   const pos = edges.attributes.position.array
@@ -449,31 +403,32 @@ function generateSpherePairs(n) {
 }
 
 function generateBrokenPairs(n) {
-  // Sphere shattered outward: take sphere edges and push their endpoints
-  // radially outward by 2.4–3.2× so the wireframe bursts apart.
-  const sphere = generateSpherePairs(n)
-  return sphere.map(({ from, to }) => {
-    const fLen = from.length() || 0.001
-    const tLen = to.length() || 0.001
-    const kF = 2.4 + Math.random() * 0.8
-    const kT = 2.4 + Math.random() * 0.8
-    return {
-      from: from.clone().multiplyScalar(kF),
-      to:   to.clone().multiplyScalar(kT),
-    }
-  })
+  return generateSpherePairs(n).map(({ from, to }) => ({
+    from: from.clone().multiplyScalar(2.5 + Math.random() * 0.8),
+    to:   to.clone().multiplyScalar(2.5 + Math.random() * 0.8),
+  }))
 }
 
 function generateConvergedPairs(n) {
-  // Stage 4 placeholder — lines are invisible here (opacity 0) and the
-  // particle field owns the beat. Collapse them to tiny segments at the
-  // hero anchor so any lingering opacity is invisible too.
+  // Lines invisible at stage 5; collapse to a point so any residual
+  // opacity stays invisible.
   const arr = []
   for (let i = 0; i < n; i++) {
     arr.push({
-      from: new THREE.Vector3(0, -1.6, 0),
-      to:   new THREE.Vector3(0.001, -1.6, 0),
+      from: new THREE.Vector3(0, -1.2, 0),
+      to:   new THREE.Vector3(0.001, -1.2, 0),
     })
   }
   return arr
+}
+
+function mulberry32(seed) {
+  let a = seed >>> 0
+  return () => {
+    a = (a + 0x6D2B79F5) >>> 0
+    let t = a
+    t = Math.imul(t ^ (t >>> 15), t | 1)
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61)
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
 }
