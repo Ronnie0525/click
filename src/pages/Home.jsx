@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { motion, useScroll, useTransform, useMotionValueEvent, AnimatePresence } from 'motion/react'
 import { useEffect, useRef, useState } from 'react'
 import Reveal, { Stagger, StaggerItem } from '../components/Reveal.jsx'
+import WorkShowcase from './WorkShowcase.jsx'
 import './Home.css'
 
 const HIGHLIGHTS = [
@@ -267,6 +268,9 @@ export default function Home() {
           </Reveal>
         </div>
       </section>
+
+      {/* WORK SHOWCASE */}
+      <WorkShowcase />
 
       {/* PROCESS */}
       <section className="section process">
