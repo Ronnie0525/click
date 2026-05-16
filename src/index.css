@@ -341,34 +341,19 @@ main {
   padding-top: var(--nav-h);
 }
 
-/* The intro overlay drives a `--intro-reveal` CSS variable (0..1) on the
-   root element. When the user is mid-intro, reveal = 0 and the site is
-   hidden behind the overlay anyway; during the reveal window the hero
-   zooms in from 50% 65% (the same screen point the intro's orange glow
-   sits at), so the orange light is the only thing that doesn't move
-   across the seam. */
-:root { --intro-reveal: 1; }
-body.is-in-intro .nav {
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(-12px);
-}
-.nav {
-  transition: opacity 0.4s ease, transform 0.5s cubic-bezier(0.22, 1, 0.36, 1), background 0.3s ease, border-color 0.3s ease;
-  opacity: var(--intro-reveal, 1);
+/* The intro is a separate overlay; the homepage stays untouched. When
+   the intro is dismissed, the site-shell fades in once so the
+   transition from intro → homepage doesn't feel like a hard cut. While
+   the intro is up, the shell is hidden behind it so this animation is
+   invisible. */
+.site-shell { animation: site-shell-fade-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
+@keyframes site-shell-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Pre-reveal: hero is tucked behind the intro overlay. As the intro's
-   reveal progress climbs 0→1, the hero scales out subtly from the same
-   anchor point as the orange glow (50% 65%). Opacity is driven by a
-   separate, delayed variable so the hero text doesn't appear while the
-   intro's "This is Click." line is still on screen. Outside the intro
-   flow (vars defaulted to 1), this is a no-op so all other pages
-   render normally. */
-.hero {
-  transform: scale(calc(0.88 + var(--intro-reveal, 1) * 0.12));
-  transform-origin: 50% 65%;
-  opacity: var(--hero-opacity, 1);
+.nav {
+  transition: background 0.3s ease, border-color 0.3s ease;
 }
 
 .page-hero {
