@@ -61,7 +61,9 @@ export default function IntroScene({ progress = 0 }) {
 
       <CameraRig progress={progress} />
       <MorphingCloud progress={progress} />
+      <StreakLines progress={progress} />
       <NetworkLines progress={progress} />
+      <WireframeShell progress={progress} />
     </Canvas>
   )
 }
@@ -233,6 +235,94 @@ function MorphingCloud({ progress }) {
         blending={THREE.AdditiveBlending}
       />
     </points>
+  )
+}
+
+/* ---------- Streak cylinders (stage 2 — "becomes lines") ----------
+ * Long thin emissive cylinders rendered at the same (x, y) positions as
+ * the MorphingCloud's stage-1 line targets. They fade in as the cloud
+ * arrives at the streak positions, so visually the particles look like
+ * they coalesce into solid trails of light, then dissolve as the cloud
+ * moves on toward the network stage.
+ */
+
+function StreakLines({ progress }) {
+  const ref = useRef()
+  const NUM = 60
+  // Use the same deterministic PRNG seed pattern as the cloud's stage-1
+  // generator concept — but here we just lay 60 streaks at random (x, y).
+  // Because they sit BEHIND/at the moving particles their alignment is
+  // visual, not exact.
+  const layout = useMemo(() => {
+    const rng = mulberry32(0x57EA)
+    return new Array(NUM).fill(0).map(() => ({
+      x: (rng() - 0.5) * 13,
+      y: (rng() - 0.5) * 7.5,
+      len: 12 + rng() * 6,
+      bright: rng() > 0.5 ? 1 : 0.6,
+    }))
+  }, [])
+
+  useFrame(() => {
+    if (!ref.current) return
+    // Peak around stage 1 (progress ≈ 0.25), invisible elsewhere.
+    const d = Math.abs(progress - 0.25)
+    const v = Math.max(0, 1 - d / 0.13)
+    ref.current.children.forEach((mesh, i) => {
+      mesh.material.opacity = v * 0.7 * layout[i].bright
+    })
+  })
+
+  return (
+    <group ref={ref}>
+      {layout.map((s, i) => (
+        <mesh key={i} position={[s.x, s.y, 0]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.018, 0.018, s.len, 6]} />
+          <meshBasicMaterial
+            color={s.bright > 0.8 ? ORANGE_BRIGHT : ORANGE}
+            transparent
+            opacity={0}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+          />
+        </mesh>
+      ))}
+    </group>
+  )
+}
+
+/* ---------- Wireframe shell (stage 4 — "forms into object") ----------
+ * Icosahedron drawn as glowing wireframe edges. Fades in as the cloud
+ * particles arrive at the sphere stage so the lines appear to emerge
+ * from the cluster of points themselves.
+ */
+
+function WireframeShell({ progress }) {
+  const ref = useRef()
+
+  useFrame((state) => {
+    if (!ref.current) return
+    const t = state.clock.getElapsedTime()
+    // Peak around stage 3 (progress ≈ 0.75), invisible elsewhere.
+    const d = Math.abs(progress - 0.75)
+    const v = Math.max(0, 1 - d / 0.14)
+    ref.current.material.opacity = v * 0.7
+    ref.current.scale.setScalar(1.75 * (0.85 + v * 0.15) * (1 + Math.sin(t * 1.8) * 0.015))
+    ref.current.rotation.y = progress * Math.PI * 2.6
+    ref.current.rotation.x = progress * Math.PI * 1.3
+  })
+
+  return (
+    <lineSegments ref={ref}>
+      <edgesGeometry args={[new THREE.IcosahedronGeometry(1, 1)]} />
+      <lineBasicMaterial
+        color={ORANGE_BRIGHT}
+        transparent
+        opacity={0}
+        blending={THREE.AdditiveBlending}
+        depthWrite={false}
+      />
+    </lineSegments>
   )
 }
 
