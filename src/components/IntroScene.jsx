@@ -177,20 +177,35 @@ function MorphingCloud({ progress }) {
     const t = state.clock.getElapsedTime()
     const arr = ref.current.geometry.attributes.position.array
 
-    // Map progress 0..1 to a continuous stage index 0..4 with smoothstep
-    // easing between adjacent stages.
+    // Map progress 0..1 to a stage segment, with a HOLD pattern inside each
+    // segment so the cloud rests at each form before launching toward the
+    // next. First 20% of a segment → stage A (still). Middle 60% → cubic
+    // ease-out morph (particles shoot toward B then settle). Last 20% →
+    // stage B (still). This is what makes the transformation feel like a
+    // morph and not a slow slide.
     const stageF = progress * (NUM_STAGES - 1)
     const stageA = Math.min(NUM_STAGES - 2, Math.floor(stageF))
     const stageB = stageA + 1
-    let lerp = Math.min(1, Math.max(0, stageF - stageA))
-    lerp = lerp * lerp * (3 - 2 * lerp)
+    const segT = Math.min(1, Math.max(0, stageF - stageA))
+    let lerp
+    if (segT < 0.2) lerp = 0
+    else if (segT > 0.8) lerp = 1
+    else {
+      const tn = (segT - 0.2) / 0.6
+      lerp = 1 - Math.pow(1 - tn, 3)         // ease-out cubic
+    }
     const a = stages[stageA]
     const b = stages[stageB]
 
-    // Ambient drift is loud at rest (lerp ≈ 0 or 1) and quiet mid-morph so
-    // the transformation reads cleanly.
-    const stable = 1 - 4 * lerp * (1 - lerp)
-    const driftAmt = stable * 0.28
+    // morphActivity peaks at the middle of a transition (0..1..0 over segT).
+    // Used to brighten + enlarge particles in flight so the morph reads as
+    // an energy burst instead of a passive slide.
+    const morphActivity = 4 * lerp * (1 - lerp)
+
+    // Ambient drift is loud when the cloud is resting at a stage (lerp near
+    // 0 or 1) and quiet mid-morph so the rush toward the new shape is clean.
+    const stable = 1 - morphActivity
+    const driftAmt = stable * 0.3
 
     for (let i = 0; i < COUNT; i++) {
       const ax = a[i * 3], ay = a[i * 3 + 1], az = a[i * 3 + 2]
@@ -212,11 +227,12 @@ function MorphingCloud({ progress }) {
     ref.current.rotation.y = progress * Math.PI * 1.4
     ref.current.rotation.x = Math.sin(progress * Math.PI) * 0.15
 
-    // Material breath + final fade so the cloud bows out as the hero takes over.
+    // Material breath + morph energy burst. Size and opacity both kick up
+    // mid-morph so the transitions register, then settle back at rest.
     const breath = 0.88 + Math.sin(t * 1.1) * 0.12
-    ref.current.material.size = 0.17 * breath
+    ref.current.material.size = 0.17 * breath * (1 + morphActivity * 0.45)
     const fade = progress < 0.92 ? 1 : Math.max(0, 1 - (progress - 0.92) / 0.08)
-    ref.current.material.opacity = 0.9 * fade
+    ref.current.material.opacity = 0.9 * fade * (1 + morphActivity * 0.3)
   })
 
   return (
@@ -265,11 +281,13 @@ function StreakLines({ progress }) {
 
   useFrame(() => {
     if (!ref.current) return
-    // Peak around stage 1 (progress ≈ 0.25), invisible elsewhere.
+    // Peak during the stable hold at stage 1 (progress ≈ 0.25) with a tight
+    // window so the streaks pop in just as the cloud settles, then fade as
+    // it lifts off toward the network stage.
     const d = Math.abs(progress - 0.25)
-    const v = Math.max(0, 1 - d / 0.13)
+    const v = Math.max(0, 1 - d / 0.08)
     ref.current.children.forEach((mesh, i) => {
-      mesh.material.opacity = v * 0.7 * layout[i].bright
+      mesh.material.opacity = v * 0.8 * layout[i].bright
     })
   })
 
@@ -303,10 +321,10 @@ function WireframeShell({ progress }) {
   useFrame((state) => {
     if (!ref.current) return
     const t = state.clock.getElapsedTime()
-    // Peak around stage 3 (progress ≈ 0.75), invisible elsewhere.
+    // Peak during the stable hold at stage 3 (progress ≈ 0.75).
     const d = Math.abs(progress - 0.75)
-    const v = Math.max(0, 1 - d / 0.14)
-    ref.current.material.opacity = v * 0.7
+    const v = Math.max(0, 1 - d / 0.08)
+    ref.current.material.opacity = v * 0.85
     ref.current.scale.setScalar(1.75 * (0.85 + v * 0.15) * (1 + Math.sin(t * 1.8) * 0.015))
     ref.current.rotation.y = progress * Math.PI * 2.6
     ref.current.rotation.x = progress * Math.PI * 1.3
@@ -370,10 +388,10 @@ function NetworkLines({ progress }) {
 
   useFrame(() => {
     if (!ref.current) return
-    // Peak around stage 2 (progress ≈ 0.5), invisible elsewhere.
+    // Peak during the stable hold at stage 2 (progress ≈ 0.5).
     const d = Math.abs(progress - 0.5)
-    const v = Math.max(0, 1 - d / 0.18)
-    ref.current.material.opacity = v * 0.55
+    const v = Math.max(0, 1 - d / 0.08)
+    ref.current.material.opacity = v * 0.7
   })
 
   return (
