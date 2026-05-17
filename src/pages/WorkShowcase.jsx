@@ -2,48 +2,48 @@ import { useParallaxImage, useRevealOnScroll } from '../hooks/useScrollReveal.js
 import './WorkShowcase.css'
 
 /**
- * WorkShowcase — placeholder portfolio section for the homepage. Six
- * dummy cards with Unsplash images, each with its own ScrollTrigger
- * reveal and a parallax-on-scroll image inside its frame. Section
- * heading uses the word-stagger reveal so it reads in dramatically.
+ * WorkShowcase — six headline advertising services rendered as cards
+ * with parallax image reveals on scroll. Same scroll behaviour as
+ * before; only the data and copy now reflect the agency's offering
+ * instead of a portfolio.
  */
 
-const WORK = [
+const SERVICES = [
   {
-    label: 'F&B',
-    title: 'A flavour you can hear.',
-    body: 'Brand voice + launch film for a Dubai dining concept.',
-    image: 'https://images.unsplash.com/photo-1559339352-11d035aa65de?w=1200&auto=format&fit=crop&q=70',
+    label: 'Brand & Identity',
+    title: 'A look that lasts.',
+    body: 'Logo, typography, voice, and brand systems built to scale with your business.',
+    image: 'https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=1200&auto=format&fit=crop&q=70',
   },
   {
-    label: 'Automotive',
-    title: 'Drive that sells itself.',
-    body: 'Multi-channel campaign for a mobility retailer.',
-    image: 'https://images.unsplash.com/photo-1492144534655-ae79c964c9d7?w=1200&auto=format&fit=crop&q=70',
+    label: 'Creative & Advertising',
+    title: 'Ideas that stop the scroll.',
+    body: 'Concept, copy, and art direction across every channel that matters.',
+    image: 'https://images.unsplash.com/photo-1542744173-8e7e53415bb0?w=1200&auto=format&fit=crop&q=70',
   },
   {
-    label: 'Real estate',
-    title: 'Spaces, well sold.',
-    body: 'Identity + content engine for a property developer.',
-    image: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=1200&auto=format&fit=crop&q=70',
+    label: 'Digital Campaigns',
+    title: 'Growth, measured.',
+    body: 'Paid media, SEO, and conversion-led campaigns engineered for ROI.',
+    image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=1200&auto=format&fit=crop&q=70',
   },
   {
-    label: 'Retail',
-    title: 'The first 3 seconds.',
-    body: 'Performance + creative for a lifestyle brand launch.',
-    image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=1200&auto=format&fit=crop&q=70',
+    label: 'Social Media',
+    title: 'Always on, never noisy.',
+    body: 'Content calendars, community management, and platform-native creative.',
+    image: 'https://images.unsplash.com/photo-1611162617474-5b21e879e113?w=1200&auto=format&fit=crop&q=70',
   },
   {
-    label: 'Events',
+    label: 'Content Production',
+    title: 'Pixels, perfected.',
+    body: 'Photography, video, and post for product launches and brand stories.',
+    image: 'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1200&auto=format&fit=crop&q=70',
+  },
+  {
+    label: 'Events & Activations',
     title: 'Rooms that remember.',
-    body: 'Experiential build for a regional brand activation.',
+    body: 'End-to-end experiential builds, from concept through to teardown.',
     image: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?w=1200&auto=format&fit=crop&q=70',
-  },
-  {
-    label: 'Corporate',
-    title: 'Trust, articulated.',
-    body: 'Strategy + comms refresh for a UAE B2B firm.',
-    image: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=1200&auto=format&fit=crop&q=70',
   },
 ]
 
@@ -52,20 +52,18 @@ export default function WorkShowcase() {
     <section className="section work-showcase">
       <div className="container">
         <div className="section-head work-showcase__head">
-          <span className="eyebrow">Selected work</span>
-          <h2>
-            Real outcomes for ambitious UAE brands.
-          </h2>
+          <span className="eyebrow">Our Services</span>
+          <h2>Six advertising disciplines, one team.</h2>
           <p>
-            A glimpse at the kind of strategy + creative + media work the Click
-            team has been shipping across the region. Placeholder visuals while
-            the new case studies are in production.
+            From brand foundations through to live campaigns and on-the-ground
+            activations — every service you need to take a UAE brand from
+            invisible to inevitable.
           </p>
         </div>
 
         <div className="work-grid">
-          {WORK.map((w, i) => (
-            <WorkCard key={w.title} item={w} index={i} />
+          {SERVICES.map((s, i) => (
+            <ServiceCard key={s.title} item={s} index={i} />
           ))}
         </div>
       </div>
@@ -73,7 +71,7 @@ export default function WorkShowcase() {
   )
 }
 
-function WorkCard({ item, index }) {
+function ServiceCard({ item, index }) {
   const cardRef = useRevealOnScroll({ y: 40, delay: (index % 3) * 0.05 })
   const imgRef = useParallaxImage(0.12)
   return (
