@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<link rel="icon" type="image/png" href="Asset/click%20Logo.png" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="Contact Click — Dubai-based advertising and digital marketing agency. Get in touch for a free consultation, project, or quote." />
+<meta name="theme-color" content="#2563EB" />
+<title>Contact — Click Agency, Dubai</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="nav">
+  <div class="nav__inner container">
+    <a href="index.html" class="nav__logo" aria-label="Click home">
+      <img src="Asset/click%20Logo.png" alt="Click">
+    </a>
+
+    <nav class="nav__links">
+      <a href="index.html" class="nav__link">Home</a>
+      <a href="about.html" class="nav__link">About</a>
+      <a href="profile.html" class="nav__link">Profile</a>
+
+      <div class="nav__dropdown">
+        <button type="button" class="nav__link nav__dropdown-trigger" aria-haspopup="true" aria-expanded="false">
+          Services
+          <svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4l4 4 4-4" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+        <div class="nav__menu">
+          <div class="nav__menu-head">
+            <span class="eyebrow">What we do</span>
+            <p>Eight specialised practices, one creative team.</p>
+          </div>
+          <div class="nav__menu-grid">
+            <a href="service-marketing.html" class="nav__menu-item"><span class="nav__menu-dot"></span><span>Marketing</span></a>
+            <a href="service-advertising.html" class="nav__menu-item"><span class="nav__menu-dot"></span><span>Advertising</span></a>
+            <a href="service-branding.html" class="nav__menu-item"><span class="nav__menu-dot"></span><span>Branding</span></a>
+            <a href="service-events.html" class="nav__menu-item"><span class="nav__menu-dot"></span><span>Events</span></a>
+            <a href="service-corporate.html" class="nav__menu-item"><span class="nav__menu-dot"></span><span>Corporate Strategies</span></a>
+            <a href="service-development.html" class="nav__menu-item"><span class="nav__menu-dot"></span><span>Business Development</span></a>
+            <a href="service-social.html" class="nav__menu-item"><span class="nav__menu-dot"></span><span>Social Media Strategies</span></a>
+            <a href="service-digital.html" class="nav__menu-item"><span class="nav__menu-dot"></span><span>Digital Campaigns</span></a>
+          </div>
+          <a href="services.html" class="nav__menu-cta">See all services <span class="btn-arrow"></span></a>
+        </div>
+      </div>
+
+    </nav>
+
+    <div class="nav__actions">
+      <a href="contact.html" class="btn btn-primary nav__cta">Let&rsquo;s Talk</a>
+      <button class="nav__burger" aria-label="Toggle menu" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+</header>
+
+<main>
+
+<section class="page-hero">
+  <div class="container">
+    <div class="page-hero__inner">
+      <span class="section-tag">Let's Talk</span>
+      <h1>Tell us about your brand. <span class="grad-text">We'll take it from there.</span></h1>
+      <p>Send us a few details about your business and goals. We'll come back within one business day with next steps and a quick recommendation — no commitment, no hard sell.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section contact-section">
+  <div class="container">
+    <div class="contact__grid">
+
+      <!-- CONTACT FORM -->
+      <form class="contact-form reveal" id="contactForm" novalidate>
+        <h3>Start a conversation</h3>
+        <p>Fields marked with * are required.</p>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="name">Full name *</label>
+            <input id="name" name="name" type="text" autocomplete="name" required>
+          </div>
+          <div class="form-group">
+            <label for="company">Company</label>
+            <input id="company" name="company" type="text" autocomplete="organization">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="email">Email *</label>
+            <input id="email" name="email" type="email" autocomplete="email" required>
+          </div>
+          <div class="form-group">
+            <label for="phone">Phone (UAE)</label>
+            <input id="phone" name="phone" type="tel" autocomplete="tel" placeholder="+971 ..">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="service">Which service are you interested in?</label>
+          <select id="service" name="service">
+            <option value="">Select a service…</option>
+            <option>Marketing</option>
+            <option>Advertising</option>
+            <option>Branding</option>
+            <option>Events</option>
+            <option>Corporate Strategies</option>
+            <option>Business Development</option>
+            <option>Social Media Strategies</option>
+            <option>Digital Campaigns</option>
+            <option>I'm not sure yet</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="message">Project details *</label>
+          <textarea id="message" name="message" rows="5" placeholder="Tell us about your business, goals, timeline, and budget range." required></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-primary form-submit">Send Message <span class="btn-arrow"></span></button>
+
+        <div class="form-success">
+          ✓ Thanks! Your message has been received. We'll be in touch within one business day.
+        </div>
+      </form>
+
+      <!-- CONTACT INFO -->
+      <aside class="contact-info">
+        <div class="contact-info__card reveal">
+          <div class="contact-info__icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          </div>
+          <div>
+            <h4>Studio</h4>
+            <p>Click Marketing &amp; Advertising</p>
+            <span class="text-muted">Business Bay, Dubai, UAE</span>
+          </div>
+        </div>
+
+        <div class="contact-info__card reveal" style="transition-delay:0.08s">
+          <div class="contact-info__icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v16H4z"/><path d="M22 6l-10 7L2 6"/></svg>
+          </div>
+          <div>
+            <h4>Email</h4>
+            <a href="mailto:hello@click.ae">hello@click.ae</a>
+            <span class="text-muted">Replies within one business day</span>
+          </div>
+        </div>
+
+        <div class="contact-info__card reveal" style="transition-delay:0.16s">
+          <div class="contact-info__icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92V20a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3.09a2 2 0 012 1.72c.13.96.37 1.9.72 2.81a2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.91.35 1.85.59 2.81.72A2 2 0 0122 16.92z"/></svg>
+          </div>
+          <div>
+            <h4>Phone</h4>
+            <a href="tel:+971000000000">+971 00 000 0000</a>
+            <span class="text-muted">Sun–Thu, 9:00–18:00 GST</span>
+          </div>
+        </div>
+
+        <div class="contact-info__card reveal" style="transition-delay:0.24s">
+          <div class="contact-info__icon" aria-hidden="true">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          </div>
+          <div>
+            <h4>Working Hours</h4>
+            <p>Sunday – Thursday</p>
+            <span class="text-muted">9:00 AM – 6:00 PM (GST)</span>
+          </div>
+        </div>
+      </aside>
+
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="container footer__inner">
+    <div class="footer__top">
+      <div class="footer__brand">
+        <a href="index.html" class="footer__logo" aria-label="Click home">
+          <img src="Asset/click%20Logo.png" alt="Click">
+        </a>
+        <p>A Dubai-based advertising &amp; digital marketing agency building brands that get clicked, remembered, and chosen.</p>
+        <a href="contact.html" class="btn btn-primary footer__cta">Start a Project <span class="btn-arrow"></span></a>
+      </div>
+
+      <div class="footer__cols">
+        <div class="footer__col">
+          <h4>Navigate</h4>
+          <a href="index.html">Home</a>
+          <a href="about.html">About</a>
+          <a href="profile.html">Profile</a>
+          <a href="services.html">Services</a>
+          <a href="contact.html">Contact</a>
+        </div>
+        <div class="footer__col">
+          <h4>Services</h4>
+          <a href="service-marketing.html">Marketing</a>
+          <a href="service-advertising.html">Advertising</a>
+          <a href="service-branding.html">Branding</a>
+          <a href="service-events.html">Events</a>
+          <a href="service-social.html">Social Media</a>
+          <a href="service-digital.html">Digital Campaigns</a>
+        </div>
+        <div class="footer__col">
+          <h4>Contact</h4>
+          <a href="mailto:hello@click.ae">hello@click.ae</a>
+          <a href="tel:+971000000000">+971 00 000 0000</a>
+          <span class="text-muted">Dubai, United Arab Emirates</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer__bottom">
+      <span>&copy; <span id="year"></span> Click Agency. All rights reserved.</span>
+      <div class="footer__legal">
+        <a href="#">Privacy</a>
+        <a href="#">Terms</a>
+        <a href="#">Careers</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<script src="scripts.js" defer></script>
+</body>
+</html>
